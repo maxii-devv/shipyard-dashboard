@@ -1,0 +1,465 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@plugin "daisyui" {
+  themes: dark --default;
+}
+
+/* ── Override DaisyUI dark theme: strip all blue/purple tints ────── */
+[data-theme="dark"] {
+  --b1: oklch(0.08 0 0);      /* body bg: near-black        */
+  --b2: oklch(0.11 0 0);      /* card/panel bg              */
+  --b3: oklch(0.14 0 0);      /* raised elements            */
+  --bc: oklch(0.82 0 0);      /* base content text          */
+  --p:  oklch(0.55 0.22 29);  /* primary: red-600           */
+  --pc: oklch(0.98 0 0);      /* primary content            */
+  --s:  oklch(0.30 0 0);      /* secondary: neutral dark    */
+  --sc: oklch(0.82 0 0);
+  --a:  oklch(0.30 0 0);      /* accent: neutral            */
+  --ac: oklch(0.82 0 0);
+  --n:  oklch(0.16 0 0);      /* neutral                    */
+  --nc: oklch(0.65 0 0);
+  --in: oklch(0.55 0.15 250); /* info: muted blue           */
+  --su: oklch(0.55 0.15 150); /* success: muted green       */
+  --wa: oklch(0.65 0.15 85);  /* warning: muted amber       */
+  --er: oklch(0.55 0.22 29);  /* error: red                 */
+  --rounded-box: 0.75rem;
+  --rounded-btn: 0.5rem;
+  --rounded-badge: 0.375rem;
+  --border-btn: 0px;
+  --tab-radius: 0.375rem;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* Pure neutral gray palette — no blue/cool chroma */
+  --color-gray-50:  oklch(0.98 0 0);
+  --color-gray-100: oklch(0.94 0 0);
+  --color-gray-200: oklch(0.88 0 0);
+  --color-gray-300: oklch(0.78 0 0);
+  --color-gray-400: oklch(0.64 0 0);
+  --color-gray-500: oklch(0.50 0 0);
+  --color-gray-600: oklch(0.38 0 0);
+  --color-gray-700: oklch(0.28 0 0);
+  --color-gray-800: oklch(0.19 0 0);
+  --color-gray-900: oklch(0.13 0 0);
+  --color-gray-950: oklch(0.09 0 0);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.08 0 0);
+  --foreground: oklch(0.92 0 0);
+  --card: oklch(0.11 0 0);
+  --card-foreground: oklch(0.92 0 0);
+  --popover: oklch(0.11 0 0);
+  --popover-foreground: oklch(0.92 0 0);
+  --primary: oklch(0.55 0.22 29);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.18 0 0);
+  --secondary-foreground: oklch(0.85 0 0);
+  --muted: oklch(0.16 0 0);
+  --muted-foreground: oklch(0.55 0 0);
+  --accent: oklch(0.18 0 0);
+  --accent-foreground: oklch(0.85 0 0);
+  --destructive: oklch(0.55 0.22 29);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.40 0 0);
+  --chart-1: oklch(0.65 0.20 29);
+  --chart-2: oklch(0.65 0.15 150);
+  --chart-3: oklch(0.65 0.15 80);
+  --chart-4: oklch(0.65 0.15 220);
+  --chart-5: oklch(0.65 0.15 300);
+  --sidebar: oklch(0.11 0 0);
+  --sidebar-foreground: oklch(0.85 0 0);
+  --sidebar-primary: oklch(0.55 0.22 29);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.16 0 0);
+  --sidebar-accent-foreground: oklch(0.75 0 0);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.40 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* ── Tiptap Script Editor ─────────────────────────────────────────── */
+.script-editor-content {
+  min-height: 320px;
+  outline: none;
+  font-size: 0.875rem;
+  line-height: 1.8;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.script-editor-content h1 {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  padding-bottom: 0.3rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.script-editor-content h2 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.script-editor-content h3 {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 0.25rem;
+}
+
+.script-editor-content p {
+  margin-bottom: 0.75rem;
+}
+
+.script-editor-content p:last-child {
+  margin-bottom: 0;
+}
+
+.script-editor-content blockquote {
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+  padding-left: 1rem;
+  margin-left: 0;
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
+  font-size: 0.8rem;
+}
+
+.script-editor-content strong {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 600;
+}
+
+.script-editor-content em {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.script-editor-content ul,
+.script-editor-content ol {
+  padding-left: 1.25rem;
+  margin-bottom: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.script-editor-content li {
+  margin-bottom: 0.25rem;
+}
+
+/* Placeholder */
+.script-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+  float: left;
+  height: 0;
+  white-space: pre-line;
+}
+
+/* Cursor */
+.script-editor-content .ProseMirror-selectednode {
+  outline: 1px solid rgba(220, 38, 38, 0.4);
+  border-radius: 4px;
+}
+
+/* Selection highlight */
+.script-editor-content ::selection {
+  background: rgba(220, 38, 38, 0.2);
+}
+/* ─── Blog Editor ────────────────────────────────────────────────────────── */
+
+.blog-editor-content .ProseMirror {
+  outline: none;
+  min-height: 400px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+/* Placeholder */
+.blog-editor-content .ProseMirror p.is-empty::before,
+.blog-editor-content .ProseMirror > p:first-child.is-empty::before {
+  content: attr(data-placeholder);
+  color: rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* Headings */
+.blog-editor-content h1 { font-size: 2rem; font-weight: 700; margin: 1.5rem 0 0.75rem; color: rgba(255,255,255,0.92); line-height: 1.2; }
+.blog-editor-content h2 { font-size: 1.5rem; font-weight: 600; margin: 1.25rem 0 0.6rem; color: rgba(255,255,255,0.88); line-height: 1.3; }
+.blog-editor-content h3 { font-size: 1.2rem; font-weight: 600; margin: 1rem 0 0.5rem; color: rgba(255,255,255,0.85); line-height: 1.4; }
+
+/* Paragraph */
+.blog-editor-content p { margin-bottom: 0.875rem; }
+
+/* Bold, italic, underline, strike */
+.blog-editor-content strong { color: rgba(255,255,255,0.95); }
+.blog-editor-content em { color: rgba(255,255,255,0.8); font-style: italic; }
+.blog-editor-content u { text-decoration-color: rgba(255,255,255,0.4); }
+.blog-editor-content s { color: rgba(255,255,255,0.4); }
+
+/* Highlight */
+.blog-editor-content mark { background: rgba(220,38,38,0.25); color: inherit; border-radius: 2px; padding: 0 2px; }
+
+/* Blockquote */
+.blog-editor-content blockquote {
+  border-left: 3px solid #dc2626;
+  margin: 1rem 0;
+  padding: 0.5rem 0 0.5rem 1.25rem;
+  color: rgba(255,255,255,0.55);
+  font-style: italic;
+}
+
+/* Inline code */
+.blog-editor-content code {
+  background: rgba(255,255,255,0.06);
+  color: #f87171;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 0.875em;
+}
+
+/* Code block */
+.blog-editor-content pre {
+  background: #1c1b1a;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.blog-editor-content pre code {
+  background: transparent;
+  color: rgba(255,255,255,0.75);
+  padding: 0;
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+
+/* hljs themes */
+.blog-editor-content .hljs-keyword { color: #c792ea; }
+.blog-editor-content .hljs-string  { color: #c3e88d; }
+.blog-editor-content .hljs-number  { color: #f78c6c; }
+.blog-editor-content .hljs-comment { color: rgba(255,255,255,0.3); font-style: italic; }
+.blog-editor-content .hljs-built_in,.blog-editor-content .hljs-type { color: #82aaff; }
+.blog-editor-content .hljs-function { color: #82aaff; }
+.blog-editor-content .hljs-title { color: #ffcb6b; }
+
+/* Lists */
+.blog-editor-content ul, .blog-editor-content ol { padding-left: 1.5rem; margin-bottom: 0.75rem; }
+.blog-editor-content li { margin-bottom: 0.25rem; }
+.blog-editor-content ul li { list-style-type: disc; }
+.blog-editor-content ol li { list-style-type: decimal; }
+
+/* Task list */
+.blog-editor-content ul[data-type="taskList"] { padding-left: 0; list-style: none; }
+.blog-editor-content ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5rem; }
+.blog-editor-content ul[data-type="taskList"] li > label { flex-shrink: 0; margin-top: 4px; }
+.blog-editor-content ul[data-type="taskList"] li input[type="checkbox"] {
+  accent-color: #dc2626;
+  width: 14px;
+  height: 14px;
+}
+
+/* Horizontal rule */
+.blog-editor-content hr {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  margin: 1.5rem 0;
+}
+
+/* Images */
+.blog-editor-content img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 0.75rem 0;
+}
+
+/* Links */
+.blog-editor-content a { color: #f87171; text-decoration: underline; text-decoration-color: rgba(248,113,113,0.4); }
+.blog-editor-content a:hover { text-decoration-color: #f87171; }
+
+/* Selection */
+.blog-editor-content ::selection { background: rgba(220,38,38,0.2); }
+
+/* Cursor focus ring */
+.blog-editor-content .ProseMirror-selectednode {
+  outline: 1px solid rgba(220,38,38,0.4);
+  border-radius: 4px;
+}
+
+
+/* ─── BlockNote Notion Editor ────────────────────────────────────────────── */
+.notion-editor-wrapper .bn-editor {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 14px !important;
+  padding: 0 !important;
+}
+
+.notion-editor-wrapper .bn-container {
+  background: transparent !important;
+  border: none !important;
+  font-family: inherit !important;
+}
+
+.notion-editor-wrapper .bn-block-group {
+  padding: 0 !important;
+}
+
+.notion-editor-wrapper [class*="blockContent"] {
+  padding: 2px 0 !important;
+}
+
+/* Headings */
+.notion-editor-wrapper h1 { font-size: 1.25rem !important; font-weight: 700 !important; color: rgba(255,255,255,0.9) !important; }
+.notion-editor-wrapper h2 { font-size: 1.1rem !important; font-weight: 600 !important; color: rgba(255,255,255,0.85) !important; }
+.notion-editor-wrapper h3 { font-size: 0.95rem !important; font-weight: 600 !important; color: rgba(255,255,255,0.8) !important; }
+
+/* Lists */
+.notion-editor-wrapper li { color: rgba(255,255,255,0.7) !important; }
+
+/* Placeholder */
+.notion-editor-wrapper [data-placeholder]::before {
+  color: rgba(255,255,255,0.18) !important;
+}
+
+/* Selection */
+.notion-editor-wrapper ::selection {
+  background: rgba(220, 38, 38, 0.2) !important;
+}
+
+
+/* ── App theme tokens (driven by SettingsProvider) ─────────────────── */
+:root {
+  --app-accent: #a78bfa;
+  --app-bg: #262624;
+  --app-surface: #21201e;
+  --app-text: #ffffff;
+}
+/* Light mode keeps the dark token values on purpose: components
+   render their normal dark palette, then the inversion filter below
+   flips the whole frame to light. Overriding the tokens here would
+   double-invert (dark text -> light -> invisible on a light card). */
+/* Light mode: the dashboard hard-codes dark hex inline across ~80
+   components, so per-property overrides can't reach them. Instead
+   invert color (hue-rotate keeps brand hues) on the two themable
+   regions. We filter the sidebar and <main> separately — never a
+   shared ancestor — so the position:fixed sidebar keeps anchoring
+   to the viewport (a filter only re-anchors a fixed *descendant*,
+   not the filtered element itself). The cursor-following coach hint
+   is portaled to <body>, outside these subtrees, so it stays put. */
+[data-theme="light"] body { background: #ffffff !important; }
+[data-theme="light"] aside[data-tour="sidebar"],
+[data-theme="light"] .app-shell main,
+[data-theme="light"] .app-shell > button {
+  filter: invert(1) hue-rotate(180deg);
+  background: #ffffff;
+}
+/* Re-invert real media so photos / logos / charts look natural. */
+[data-theme="light"] aside[data-tour="sidebar"] img,
+[data-theme="light"] .app-shell main img,
+[data-theme="light"] .app-shell main video,
+[data-theme="light"] .app-shell main canvas,
+[data-theme="light"] [data-no-invert] {
+  filter: invert(1) hue-rotate(180deg);
+}
