@@ -1,6 +1,6 @@
-// Password-gate middleware. Replaces the no-op pass-through.
+// Password-gate middleware + global security posture.
 //
-// Public (always allowed):
+// Public (always allowed, never password-gated):
 //   - /login                                       (login page)
 //   - /api/login, /api/logout                       (session lifecycle)
 //   - /api/cron/*                                   (own bearer auth via CRON_SECRET)
@@ -9,38 +9,90 @@
 //
 // Everything else requires the `app_session` cookie. Unauthenticated browser
 // requests are redirected to /login; unauthenticated API requests get 401 JSON.
+//
+// Beyond auth, this also:
+//   - Fast-404s common bot-scanner paths (no auth round-trip, no logs noise)
+//   - Enforces same-origin on every state-changing request (POST/PATCH/PUT/DELETE)
+//     for session-gated endpoints — CSRF defense in depth on top of SameSite=Lax
+//   - Attaches HSTS / X-Frame-Options / CSP / Referrer-Policy / Permissions-Policy
+//     to every response
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { verifySession, SESSION_COOKIE } from '@/lib/session'
+import { isSameOrigin } from '@/lib/security/origin'
+import { applySecurityHeaders } from '@/lib/security/headers'
 
 const PUBLIC_PATH_RE = /^\/(login|api\/login|api\/logout)(\/|$)/
 const CRON_PATH_RE = /^\/api\/cron(\/|$)/
 const FILES_PATH_RE = /^\/api\/files(\/|$)/
 const STATIC_PATH_RE = /^\/(?:_next\/static|_next\/image|favicon\.ico|robots\.txt|icons?\/)/
 
+// Bot scanners hammer these constantly. 404-ing in middleware avoids dragging
+// the whole Next route stack through a `.env` probe. The regex covers the
+// classics: env / git / common admin panels / known CMS endpoints.
+const SCANNER_PATH_RE =
+  /^\/(?:\.env|\.git\/|\.aws\/|\.ssh\/|wp-(?:admin|login|content|includes)|wordpress|administrator|phpmyadmin|pma|adminer|server-status|server-info|HNAP1|owa|manager\/html|jenkins|actuator|console|fckeditor|cgi-bin|boaform|setup\.cgi|vendor\/phpunit|laravel|tinymce|webdav)/i
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
+  const method = req.method
 
-  if (
-    STATIC_PATH_RE.test(pathname) ||
-    PUBLIC_PATH_RE.test(pathname) ||
-    CRON_PATH_RE.test(pathname) ||
-    FILES_PATH_RE.test(pathname)
-  ) {
-    return NextResponse.next()
+  // 1. Hard-block scanner noise before doing anything else.
+  if (SCANNER_PATH_RE.test(pathname)) {
+    return applySecurityHeaders(req, new NextResponse('Not Found', { status: 404 }))
   }
 
+  // 2. Static / always-public paths bypass the session check.
+  const isStatic = STATIC_PATH_RE.test(pathname)
+  const isPublic = PUBLIC_PATH_RE.test(pathname)
+  const isCron = CRON_PATH_RE.test(pathname)
+  const isFiles = FILES_PATH_RE.test(pathname)
+
+  if (isStatic) {
+    return applySecurityHeaders(req, NextResponse.next())
+  }
+
+  // 3. Origin/Referer enforcement on session-mutating endpoints.
+  //    /api/cron/* uses Bearer auth so cross-origin POSTs from a script are
+  //    legitimate — opt them out. /api/files PUT uses an HMAC token URL
+  //    that's bound to (bucket, key, exp) so the cookie is irrelevant.
+  if (!isCron && !isFiles && !isStatic) {
+    if (!isSameOrigin(req)) {
+      // Logout and login pages don't need a cookie, but they do need to be
+      // posted from our own origin — same rule applies.
+      if (pathname.startsWith('/api/')) {
+        return applySecurityHeaders(req, NextResponse.json({ error: 'cross-origin blocked' }, { status: 403 }))
+      }
+      // For non-API mutating requests (rare; mostly forms), bounce to /login.
+      const url = req.nextUrl.clone()
+      url.pathname = '/login'
+      return applySecurityHeaders(req, NextResponse.redirect(url))
+    }
+  }
+
+  // 4. Public auth endpoints / cron / files paths skip the cookie check.
+  if (isPublic || isCron || isFiles) {
+    return applySecurityHeaders(req, NextResponse.next())
+  }
+
+  // 5. Session-gated everything else.
   const cookie = req.cookies.get(SESSION_COOKIE)?.value
-  if (await verifySession(cookie)) return NextResponse.next()
+  if (await verifySession(cookie)) {
+    return applySecurityHeaders(req, NextResponse.next())
+  }
 
   // API → 401 JSON; pages → redirect to /login with ?next=
   if (pathname.startsWith('/api/')) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    return applySecurityHeaders(req, NextResponse.json({ error: 'unauthorized' }, { status: 401 }))
   }
   const url = req.nextUrl.clone()
   url.pathname = '/login'
-  url.searchParams.set('next', pathname + (req.nextUrl.search || ''))
-  return NextResponse.redirect(url)
+  // GETs only — never redirect a POST to /login (the body would be lost and
+  // the user-agent would silently downgrade to GET).
+  if (method === 'GET') {
+    url.searchParams.set('next', pathname + (req.nextUrl.search || ''))
+  }
+  return applySecurityHeaders(req, NextResponse.redirect(url))
 }
 
 export const config = {

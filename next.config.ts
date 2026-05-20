@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   // `.next/standalone/`, which is what the Docker image runs. Without this the
   // Dockerfile would have to ship the whole node_modules tree.
   output: 'standalone',
+  // Drop the "X-Powered-By: Next.js" fingerprint header. Defence-in-depth
+  // alongside the explicit delete in lib/security/headers.ts.
+  poweredByHeader: false,
   transpilePackages: ['@excalidraw/excalidraw'],
   turbopack: {
     root: __dirname,
