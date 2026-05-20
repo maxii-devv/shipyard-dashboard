@@ -18,8 +18,8 @@ If you're new to the codebase, skim **[Things That Look Broken But Aren't](#thin
 | TLS cert | Let's Encrypt, issuer `E8`. Files in `/etc/letsencrypt/live/izan.62-171-142-52.nip.io/` on the VPS. Auto-renews via certbot's systemd timer. |
 | VPS public IP | `62.171.142.52` (Contabo-ish, treat as the canonical IP) |
 | Reverse proxy | host-level nginx, vhost at `/etc/nginx/sites-available/izan-shipyard` (auto-edited by certbot to add 443 + redirect) |
-| VPS app dir | `/izan/app` (the `shipyard-dashboard` repo checked out here) |
-| GitHub repo | `maxii-devv/shipyard-dashboard` |
+| VPS app dir | `/izan/app` (the `izan-dashboard` repo checked out here) |
+| GitHub repo | `maxii-devv/izan-dashboard` (renamed from `shipyard-dashboard` on 2026-05-21; GitHub redirects the old URL for now, both local + VPS git remotes already updated) |
 | Container name | `izan-app` |
 | DB container | `izan-db` (PostgreSQL 17) |
 | Backup dir | `/izan/app.bak-20260520-001827` (delete after stability soak) |
