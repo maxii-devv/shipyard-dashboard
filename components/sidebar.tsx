@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Tag, FileSearch, Activity, Zap, Instagram, Youtube, Settings, BarChart3, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Tag, FileSearch, Activity, Instagram, Youtube, Settings, BarChart3, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { Sparkline } from '@/components/sparkline'
 import { useSettings } from '@/components/settings-context'
 
@@ -327,15 +327,6 @@ export function Sidebar({ userEmail: _userEmail }: SidebarProps) {
           <PanelLeftOpen className="w-4 h-4" />
         </button>
 
-        <Link
-          href="/dashboard"
-          title="Viral Coach"
-          className="mt-3 w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ background: 'linear-gradient(135deg, #dc2626, #991b1b)' }}
-        >
-          <Zap className="w-4 h-4 text-white" />
-        </Link>
-
         <nav className="flex-1 mt-4 flex flex-col items-center gap-1 overflow-y-auto w-full">
           {sections
             .flatMap(s => s.items)
@@ -381,21 +372,9 @@ export function Sidebar({ userEmail: _userEmail }: SidebarProps) {
       }}
     >
       <div
-        className="px-4 py-4 flex items-center justify-between gap-2"
+        className="px-4 py-4 flex items-center justify-end gap-2"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
       >
-        <Link href="/dashboard" className="flex items-center gap-2.5 min-w-0">
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #dc2626, #991b1b)' }}
-          >
-            <Zap className="w-3.5 h-3.5 text-white" />
-          </div>
-          <div className="min-w-0">
-            <p className="font-semibold text-white text-[13px] tracking-tight leading-none">Viral Coach</p>
-            <p className="text-[10px] leading-none mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>Instagram insights</p>
-          </div>
-        </Link>
         <button
           onClick={toggleSidebar}
           title="Hide sidebar"
