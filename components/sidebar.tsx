@@ -371,30 +371,25 @@ export function Sidebar({ userEmail: _userEmail }: SidebarProps) {
         height: 'calc(100vh - 24px)',
       }}
     >
-      <div
-        className="px-4 py-4 flex items-center justify-end gap-2"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+      <button
+        onClick={toggleSidebar}
+        title="Hide sidebar"
+        aria-label="Hide sidebar"
+        className="absolute top-2.5 right-2.5 flex items-center justify-center w-7 h-7 rounded-md flex-shrink-0 transition-all z-10"
+        style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)' }}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = 'var(--app-accent)'
+          e.currentTarget.style.color = '#262624'
+          e.currentTarget.style.transform = 'scale(1.08)'
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+          e.currentTarget.style.color = 'rgba(255,255,255,0.45)'
+          e.currentTarget.style.transform = 'scale(1)'
+        }}
       >
-        <button
-          onClick={toggleSidebar}
-          title="Hide sidebar"
-          aria-label="Hide sidebar"
-          className="flex items-center justify-center w-7 h-7 rounded-md flex-shrink-0 transition-all"
-          style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)' }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = 'var(--app-accent)'
-            e.currentTarget.style.color = '#262624'
-            e.currentTarget.style.transform = 'scale(1.08)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
-            e.currentTarget.style.color = 'rgba(255,255,255,0.45)'
-            e.currentTarget.style.transform = 'scale(1)'
-          }}
-        >
-          <PanelLeftClose className="w-4 h-4" />
-        </button>
-      </div>
+        <PanelLeftClose className="w-4 h-4" />
+      </button>
 
       <Suspense
         fallback={
