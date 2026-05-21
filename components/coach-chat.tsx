@@ -42,6 +42,7 @@ export function CoachChat({ days }: { days: number }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Cursor-following hint shown while hovering the toggle bar.
   const [hint, setHint] = useState<string | null>(null)
@@ -120,7 +121,19 @@ export function CoachChat({ days }: { days: number }) {
   return (
     <section className="space-y-3">
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => {
+          // Opening with a hover hint visible → prefill it so the user can
+          // hit Enter / edit instead of retyping. Don't overwrite anything
+          // they've already typed; don't touch input when closing.
+          if (!open && hoverHint && hint && !input.trim()) {
+            setInput(hint)
+          }
+          setOpen(o => {
+            const next = !o
+            if (next) requestAnimationFrame(() => textareaRef.current?.focus())
+            return next
+          })
+        }}
         aria-expanded={open}
         onMouseEnter={() => hoverHint && setHint(pickQuestion())}
         onMouseMove={e => setCursor({ x: e.clientX, y: e.clientY })}
@@ -266,6 +279,7 @@ export function CoachChat({ days }: { days: number }) {
             }}
           >
             <textarea
+              ref={textareaRef}
               value={input}
               rows={1}
               placeholder="Ask about hooks, scripts, what to post next…"
