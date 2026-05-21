@@ -45,9 +45,14 @@ RUN apk add --no-cache libc6-compat git ripgrep \
 # Run as a non-root user (matches the official Next.js standalone example).
 # The Claude Code session/auth lives at /home/nextjs/.claude, which is
 # expected to be a host-mounted volume populated by `claude /login`.
+# The CLI also reads /home/nextjs/.claude.json (project/session state) on
+# every invocation. That file sits OUTSIDE the mounted volume by default and
+# would be wiped on every image rebuild — symlink it INTO the volume so the
+# state persists across rebuilds.
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 --home /home/nextjs --shell /bin/sh nextjs \
  && mkdir -p /data/uploads /home/nextjs/.claude \
+ && ln -sf /home/nextjs/.claude/.claude.json /home/nextjs/.claude.json \
  && chown -R nextjs:nodejs /data /home/nextjs
 
 # `.next/standalone` already includes a pruned node_modules with only the
