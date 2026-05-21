@@ -43,6 +43,9 @@ export function CoachChat({ days }: { days: number }) {
   const [error, setError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // Remember the last hint we auto-filled so a second open with a new hint
+  // can overwrite it. We only avoid overwriting text the *user* typed.
+  const lastPrefilledRef = useRef<string | null>(null)
 
   // Cursor-following hint shown while hovering the toggle bar.
   const [hint, setHint] = useState<string | null>(null)
@@ -123,10 +126,18 @@ export function CoachChat({ days }: { days: number }) {
       <button
         onClick={() => {
           // Opening with a hover hint visible → prefill it so the user can
-          // hit Enter / edit instead of retyping. Don't overwrite anything
-          // they've already typed; don't touch input when closing.
-          if (!open && hoverHint && hint && !input.trim()) {
-            setInput(hint)
+          // hit Enter / edit instead of retyping. Safe to overwrite when the
+          // textarea is empty OR still holds the previously auto-filled hint
+          // (re-opening with a new hint should replace, not stick). Anything
+          // the user actually typed is left alone.
+          if (!open && hoverHint && hint) {
+            const current = input
+            const overwritable =
+              current.trim() === '' || current === lastPrefilledRef.current
+            if (overwritable) {
+              setInput(hint)
+              lastPrefilledRef.current = hint
+            }
           }
           setOpen(o => {
             const next = !o
