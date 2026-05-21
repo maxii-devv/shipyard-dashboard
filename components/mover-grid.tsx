@@ -175,8 +175,12 @@ function MoverCard({ mover }: { mover: Mover }) {
         </div>
 
         {sparkData.length >= 2 && (
+          // Wrapper is pointer-events:auto so the sparkline can capture
+          // mousemove for its hover tooltip. The sparkline doesn't
+          // preventDefault on clicks, so taps still bubble to the parent <a>
+          // and the permalink continues to open.
           <div
-            className="absolute bottom-9 left-2 right-2 pointer-events-none"
+            className="absolute bottom-9 left-2 right-2"
             style={{ opacity: 0.8 }}
           >
             <Sparkline
@@ -186,6 +190,9 @@ function MoverCard({ mover }: { mover: Mover }) {
               strokeWidth={1.5}
               showDot
               fill
+              interactive
+              dates={mover.history.map(h => fmtDate(h.captured_date))}
+              valueFormatter={fmt}
             />
           </div>
         )}

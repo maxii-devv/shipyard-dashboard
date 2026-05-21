@@ -29,9 +29,13 @@ interface PerformanceViewProps {
   outliers: OutlierPost[]
   patterns: ViralPatterns['patterns']
   daysLabel: string
+  /** When true, omit the "Top Performers" section header — the parent (e.g.
+   *  PerformanceMoversTabs) is already rendering its own segmented-control
+   *  header in that slot. The OutlierGrid and Patterns block still render. */
+  headerless?: boolean
 }
 
-export function PerformanceView({ outliers, patterns, daysLabel }: PerformanceViewProps) {
+export function PerformanceView({ outliers, patterns, daysLabel, headerless = false }: PerformanceViewProps) {
   const [filter, setFilter] = useState<Filter | null>(null)
 
   const filteredOutliers = useMemo(() => {
@@ -52,12 +56,14 @@ export function PerformanceView({ outliers, patterns, daysLabel }: PerformanceVi
   return (
     <>
       <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Flame className="w-4 h-4" style={{ color: '#f59e0b' }} />
-          <h2 className="text-[11px] uppercase tracking-widest font-semibold text-white/45">
-            Top Performers — {outliers.length} outlier{outliers.length !== 1 ? 's' : ''} (2x+ avg)
-          </h2>
-        </div>
+        {!headerless && (
+          <div className="flex items-center gap-2">
+            <Flame className="w-4 h-4" style={{ color: '#f59e0b' }} />
+            <h2 className="text-[11px] uppercase tracking-widest font-semibold text-white/45">
+              Top Performers — {outliers.length} outlier{outliers.length !== 1 ? 's' : ''} (2x+ avg)
+            </h2>
+          </div>
+        )}
         {outliers.length === 0 ? (
           <Empty>No outliers in the last {daysLabel}. Keep posting.</Empty>
         ) : (

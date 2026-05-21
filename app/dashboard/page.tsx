@@ -3,15 +3,13 @@ import { extractPatterns, type BreakdownRow } from '@/lib/services/viralPatterns
 import { getTopMoversWithHistory, type TopMover, type HistoryPoint } from '@/lib/services/growthService'
 import { getPostingActivity, getPostingInsight, getLatestPost } from '@/lib/services/postingActivityService'
 import { PostingHeatmap } from '@/components/posting-heatmap'
-import { PerformanceView } from '@/components/performance-view'
-import { MoverGrid } from '@/components/mover-grid'
+import { PerformanceMoversTabs } from '@/components/performance-movers-tabs'
 import { CoachTabs } from '@/components/coach-tabs'
 import { CoachAskInline } from '@/components/coach-ask-inline'
 import { LastPostCoach } from '@/components/last-post-coach'
 import { DashboardRefreshButton } from '@/components/dashboard-refresh-button'
 import { generateInsights, generateSalesInsights, generateLastPostCoaching } from '@/lib/services/coachInsightsService'
 import {
-  TrendingUp,
   Zap,
   Layers,
   Eye,
@@ -170,22 +168,17 @@ export default async function DashboardHome({
         <CoachAskInline days={days} accent="#a78bfa" />
       </div>
 
-      {/* ── Top Performers + Patterns (filterable) ─────────────────────────── */}
-      <PerformanceView outliers={outliers} patterns={patterns} daysLabel={`${days} days`} />
-
-      {/* ── Top Movers ─────────────────────────────────────────────────────── */}
-      <Section
-        icon={<TrendingUp className="w-4 h-4" style={{ color: '#34d399' }} />}
-        title={`Top Movers — last ${moversWindow}d`}
-      >
-        {movers.length === 0 ? (
-          <Empty>
-            No view growth recorded yet. Snapshots run daily at 06:00 UTC (Vercel Hobby plan — Pro unlocks 6h sync) — come back in 24h for day-over-day deltas.
-          </Empty>
-        ) : (
-          <MoverGrid movers={movers} />
-        )}
-      </Section>
+      {/* ── Top Performers / Top Movers (segmented control) ───────────────── */}
+      {/* Single section with a tab toggle in the header. "Top Performers"
+          renders the outlier grid + Patterns block (the filterable view);
+          "Top Movers" renders the day-over-day growth cards. */}
+      <PerformanceMoversTabs
+        outliers={outliers}
+        patterns={patterns}
+        movers={movers}
+        daysLabel={`${days} days`}
+        moversWindow={moversWindow}
+      />
 
       {/* ── Posting Activity ───────────────────────────────────────────────── */}
       {activity.length > 0 && (
@@ -291,21 +284,6 @@ function Section({
       </div>
       {children}
     </section>
-  )
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className="rounded-xl px-4 py-6 text-[12px] text-center"
-      style={{
-        background: '#2d2c2a',
-        border: '1px dashed rgba(255,255,255,0.07)',
-        color: 'rgba(255,255,255,0.35)',
-      }}
-    >
-      {children}
-    </div>
   )
 }
 
