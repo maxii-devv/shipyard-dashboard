@@ -8,6 +8,7 @@ import { MoverGrid } from '@/components/mover-grid'
 import { CoachTabs } from '@/components/coach-tabs'
 import { CoachChat } from '@/components/coach-chat'
 import { LastPostCoach } from '@/components/last-post-coach'
+import { DashboardRefreshButton } from '@/components/dashboard-refresh-button'
 import { generateInsights, generateSalesInsights, generateLastPostCoaching } from '@/lib/services/coachInsightsService'
 import {
   TrendingUp,
@@ -86,7 +87,7 @@ export default async function DashboardHome({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {[30, 60, 90].map(d => (
+          {[7, 30, 60, 90].map(d => (
             <Link
               key={d}
               href={`/dashboard?days=${d}`}
@@ -100,6 +101,7 @@ export default async function DashboardHome({
               {d}d
             </Link>
           ))}
+          <DashboardRefreshButton />
         </div>
       </div>
 

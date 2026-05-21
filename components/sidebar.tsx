@@ -145,7 +145,11 @@ interface SidebarStatsPayload {
 function ProfileStats() {
   const searchParams = useSearchParams()
   const daysParam = searchParams?.get('days')
-  const days = Math.min(Math.max(parseInt(daysParam ?? '30', 10) || 30, 1), 365)
+  // Default to 90 to match the Instagram dashboard's server-side default
+  // (app/dashboard/page.tsx). Previously this defaulted to 30, which caused
+  // the sidebar stat to show "views · 30d" while the main view rendered 90d
+  // on a fresh `/dashboard` load with no `?days=` param.
+  const days = Math.min(Math.max(parseInt(daysParam ?? '90', 10) || 90, 1), 365)
 
   const [stats, setStats] = useState<SidebarStatsPayload | null>(null)
   const [loading, setLoading] = useState(true)
