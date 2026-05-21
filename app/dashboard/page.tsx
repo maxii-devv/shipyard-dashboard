@@ -6,7 +6,7 @@ import { PostingHeatmap } from '@/components/posting-heatmap'
 import { PerformanceView } from '@/components/performance-view'
 import { MoverGrid } from '@/components/mover-grid'
 import { CoachTabs } from '@/components/coach-tabs'
-import { CoachChat } from '@/components/coach-chat'
+import { CoachAskInline } from '@/components/coach-ask-inline'
 import { LastPostCoach } from '@/components/last-post-coach'
 import { DashboardRefreshButton } from '@/components/dashboard-refresh-button'
 import { generateInsights, generateSalesInsights, generateLastPostCoaching } from '@/lib/services/coachInsightsService'
@@ -158,11 +158,17 @@ export default async function DashboardHome({
         <LastPostCoach post={latestPost} coaching={lastPostCoaching} />
       )}
 
-      {/* ── Coach (Sales / Views tabs) ────────────────────────────────────── */}
-      <CoachTabs salesCoach={salesCoach} viewsCoach={viewsCoach} daysLabel={`${days}d`} />
-
-      {/* ── Ask the Coach (Claude chat) ───────────────────────────────────── */}
-      <CoachChat days={days} />
+      {/* ── Coach (Sales / Views tabs) + Ask the Coach ────────────────────── */}
+      {/* Side by side: Coach panel on the left (2/3 width), Ask-the-Coach chat
+          on the right (1/3). On a narrow viewport this collapses to one
+          column so the chat moves below the coach. items-stretch keeps both
+          cards equal height when they sit next to each other. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-stretch">
+        <div className="lg:col-span-2">
+          <CoachTabs salesCoach={salesCoach} viewsCoach={viewsCoach} daysLabel={`${days}d`} />
+        </div>
+        <CoachAskInline days={days} accent="#a78bfa" />
+      </div>
 
       {/* ── Top Performers + Patterns (filterable) ─────────────────────────── */}
       <PerformanceView outliers={outliers} patterns={patterns} daysLabel={`${days} days`} />

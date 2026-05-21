@@ -227,6 +227,11 @@ export async function GET(req: NextRequest) {
   const { detectConversions } = await import('@/lib/backend/services/conversionDetectionService')
   const detection = await detectConversions()
 
+  // Finally, prune anything older than the retention window so DB growth stays
+  // bounded. Kept inside the same cron so we never need a second scheduler.
+  const { pruneOldData } = await import('@/lib/backend/services/retentionService')
+  const retention = await pruneOldData()
+
   const summary = {
     processed,
     insights_failed: insightsFailed.length,
@@ -236,6 +241,7 @@ export async function GET(req: NextRequest) {
     token_refresh: tokenRefresh,
     linked,
     detection,
+    retention,
   }
 
   await maybeAlert(summary)
