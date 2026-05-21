@@ -156,16 +156,16 @@ export default async function DashboardHome({
         <LastPostCoach post={latestPost} coaching={lastPostCoaching} />
       )}
 
-      {/* ── Coach (Sales / Views tabs) + Ask the Coach ────────────────────── */}
-      {/* Side by side: Coach panel on the left (2/3 width), Ask-the-Coach chat
-          on the right (1/3). On a narrow viewport this collapses to one
-          column so the chat moves below the coach. items-stretch keeps both
+      {/* ── Ask the Coach + Coach (Sales / Views tabs) ────────────────────── */}
+      {/* Side by side: Ask-the-Coach chat on the left (1/3 width), Coach panel
+          on the right (2/3). On a narrow viewport this collapses to one
+          column so the chat moves above the coach. items-stretch keeps both
           cards equal height when they sit next to each other. */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-stretch">
+        <CoachAskInline days={days} accent="#a78bfa" />
         <div className="lg:col-span-2">
           <CoachTabs salesCoach={salesCoach} viewsCoach={viewsCoach} daysLabel={`${days}d`} />
         </div>
-        <CoachAskInline days={days} accent="#a78bfa" />
       </div>
 
       {/* ── Top Performers / Top Movers (segmented control) ───────────────── */}

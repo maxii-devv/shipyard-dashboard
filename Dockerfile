@@ -28,13 +28,27 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
-    UPLOADS_DIR=/data/uploads
+    UPLOADS_DIR=/data/uploads \
+    CLAUDE_HOME=/home/nextjs
+
+# Claude Code CLI for /api/chat. The chat route shells out to `claude --print`
+# instead of calling the Anthropic API directly, so model usage is billed to
+# Izan's Claude subscription (via OAuth session in /home/nextjs/.claude)
+# rather than per-token API credits. Installed before the USER switch so
+# `npm install -g` can write to /usr/local/lib/node_modules.
+# - libc6-compat: glibc shim for prebuilt native binaries
+# - git, ripgrep: tools Claude Code probes for on startup; we disable them in
+#   the spawn args but the CLI is quieter when they exist on PATH.
+RUN apk add --no-cache libc6-compat git ripgrep \
+ && npm install -g --no-audit --no-fund @anthropic-ai/claude-code
 
 # Run as a non-root user (matches the official Next.js standalone example).
+# The Claude Code session/auth lives at /home/nextjs/.claude, which is
+# expected to be a host-mounted volume populated by `claude /login`.
 RUN addgroup --system --gid 1001 nodejs \
- && adduser --system --uid 1001 nextjs \
- && mkdir -p /data/uploads \
- && chown -R nextjs:nodejs /data
+ && adduser --system --uid 1001 --home /home/nextjs --shell /bin/sh nextjs \
+ && mkdir -p /data/uploads /home/nextjs/.claude \
+ && chown -R nextjs:nodejs /data /home/nextjs
 
 # `.next/standalone` already includes a pruned node_modules with only the
 # runtime deps Next traced as reachable from your routes — we still ship

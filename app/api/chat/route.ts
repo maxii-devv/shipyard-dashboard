@@ -1,12 +1,22 @@
 import { NextRequest } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { spawn } from 'node:child_process'
 import { extractPatterns, type ViralPatterns } from '@/lib/services/viralPatternsService'
 import { KNOWLEDGE_BASE } from '@/lib/knowledge-base'
 
-// Streaming endpoint — never cache.
+// Streaming endpoint — never cache. Uses child_process, so force the Node
+// runtime (not Edge).
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
-const MODEL = 'claude-opus-4-7'
+// The Claude Code CLI binary, installed in the Docker runtime image via
+// `npm install -g @anthropic-ai/claude-code`. Override CLAUDE_BIN at deploy
+// time if it's at a non-standard path (e.g. local dev `npx claude`).
+const CLAUDE_BIN = process.env.CLAUDE_BIN ?? 'claude'
+const MODEL = process.env.CLAUDE_CHAT_MODEL ?? 'claude-opus-4-7'
+
+// Subprocess hard limit — well above what a single answer needs but stops a
+// runaway claude process from holding a worker forever if streaming stalls.
+const SUBPROCESS_TIMEOUT_MS = 90_000
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -86,20 +96,32 @@ Ground every answer in two things:
 Be specific and concrete, never generic. Sound like a sharp operator talking,
 not a marketer writing. If the live data is missing or thin, say so plainly
 instead of inventing numbers. Never fabricate revenue, client names, or case
-studies.`
+studies.
+
+You are NOT in agent mode — do not call tools, do not read or write files,
+do not run shell commands. Just answer.`
+
+// Flatten the chat history into a single prompt the CLI can read on stdin.
+// Claude Code's --print mode treats stdin as one user turn, so past
+// assistant turns are inlined as quoted context rather than separate role
+// messages. The model is good at reading this back as a conversation.
+function buildPromptFromHistory(messages: ChatMessage[]): string {
+  if (messages.length === 1 && messages[0].role === 'user') {
+    return messages[0].content
+  }
+  const parts: string[] = ['<conversation>']
+  for (const m of messages) {
+    parts.push(`<${m.role}>`)
+    parts.push(m.content)
+    parts.push(`</${m.role}>`)
+  }
+  parts.push('</conversation>')
+  parts.push('')
+  parts.push('Continue the conversation — write only your next assistant reply, no XML wrappers, no role labels.')
+  return parts.join('\n')
+}
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    return Response.json(
-      {
-        error:
-          'ANTHROPIC_API_KEY is not set. Add it to viral-coach-ui/.env.local (get a key at https://console.anthropic.com/settings/keys) and redeploy / restart the dev server.',
-      },
-      { status: 503 }
-    )
-  }
-
   let body: { messages?: ChatMessage[]; days?: number }
   try {
     body = await req.json()
@@ -111,7 +133,10 @@ export async function POST(req: NextRequest) {
     m => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim()
   )
   if (messages.length === 0 || messages[0].role !== 'user') {
-    return Response.json({ error: 'messages must be a non-empty array starting with a user turn' }, { status: 400 })
+    return Response.json(
+      { error: 'messages must be a non-empty array starting with a user turn' },
+      { status: 400 }
+    )
   }
 
   const days = Math.min(Math.max(body.days ?? 90, 1), 365)
@@ -126,56 +151,103 @@ export async function POST(req: NextRequest) {
     liveData = `# Live dashboard data\n(Unavailable — the database could not be reached. Answer from the knowledge base and tell Izan the live numbers are not loading.)`
   }
 
-  const client = new Anthropic({ apiKey })
+  const systemPrompt = `${ROLE_INSTRUCTION}\n\n---\n\n# Brand knowledge base\n\n${KNOWLEDGE_BASE}\n\n---\n\n${liveData}`
+  const userPrompt = buildPromptFromHistory(messages)
 
-  // Stable prefix (role + KB) is cached; volatile live data sits after the
-  // cache breakpoint so it never invalidates the cached portion.
-  const system: Anthropic.TextBlockParam[] = [
-    {
-      type: 'text',
-      text: `${ROLE_INSTRUCTION}\n\n---\n\n${KNOWLEDGE_BASE}`,
-      cache_control: { type: 'ephemeral' },
-    },
-    {
-      type: 'text',
-      text: liveData,
-    },
+  // Disable every Claude Code agentic capability — this is chat, not an
+  // agent. --max-turns 1 also prevents reflective sub-loops.
+  const args = [
+    '--print',
+    '--output-format', 'text',
+    '--model', MODEL,
+    '--max-turns', '1',
+    '--append-system-prompt', systemPrompt,
+    '--disallowed-tools', 'Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,Task,TodoWrite,NotebookEdit,SlashCommand,KillShell,BashOutput',
+    '--strict-mcp-config',
   ]
 
-  try {
-    const anthropicStream = client.messages.stream({
-      model: MODEL,
-      max_tokens: 16000,
-      system,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-    })
+  // Use a writable scratch CWD so claude doesn't try to roam the repo if it
+  // ever bypassed --disallowed-tools. /tmp is always writable in the image.
+  const proc = spawn(CLAUDE_BIN, args, {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    cwd: '/tmp',
+    env: {
+      ...process.env,
+      // HOME must point at the volume-mounted .claude dir (auth state).
+      HOME: process.env.CLAUDE_HOME ?? process.env.HOME,
+      // Don't ever fall back to an API key — the whole point is the
+      // subscription session. If auth is missing, fail loudly.
+      ANTHROPIC_API_KEY: '',
+    },
+  })
 
-    const encoder = new TextEncoder()
-    const readable = new ReadableStream<Uint8Array>({
-      start(controller) {
-        anthropicStream.on('text', t => controller.enqueue(encoder.encode(t)))
-        anthropicStream.on('error', e => {
-          console.error('chat: stream error', e)
+  // Send the user-facing prompt over stdin (avoids ARG_MAX issues if the
+  // system prompt + history ever grow large).
+  proc.stdin.write(userPrompt)
+  proc.stdin.end()
+
+  let stderr = ''
+  let timer: NodeJS.Timeout | null = null
+  let timedOut = false
+
+  const readable = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const encoder = new TextEncoder()
+
+      timer = setTimeout(() => {
+        timedOut = true
+        proc.kill('SIGKILL')
+      }, SUBPROCESS_TIMEOUT_MS)
+
+      proc.stdout.on('data', chunk => {
+        try { controller.enqueue(chunk) } catch { /* closed */ }
+      })
+
+      proc.stderr.on('data', chunk => {
+        stderr += chunk.toString()
+      })
+
+      proc.on('error', err => {
+        console.error('chat: spawn failed', err)
+        try {
+          controller.enqueue(encoder.encode(
+            `\n\n[claude CLI failed to start: ${err.message}. Is @anthropic-ai/claude-code installed in the image and is /home/nextjs/.claude mounted with a logged-in session?]`
+          ))
+        } catch {}
+        if (timer) clearTimeout(timer)
+        controller.close()
+      })
+
+      proc.on('close', code => {
+        if (timer) clearTimeout(timer)
+        if (timedOut) {
           try {
-            controller.enqueue(encoder.encode('\n\n[stream error — see server logs]'))
+            controller.enqueue(encoder.encode(
+              `\n\n[claude timed out after ${SUBPROCESS_TIMEOUT_MS / 1000}s — your subscription may be rate-limited, or the model stalled.]`
+            ))
           } catch {}
-          controller.close()
-        })
-        anthropicStream.on('end', () => controller.close())
-      },
-      cancel() {
-        anthropicStream.abort()
-      },
-    })
+        } else if (code !== 0) {
+          // Surface auth / rate-limit failures in the stream so the UI shows
+          // them instead of an empty bubble.
+          const detail = stderr.trim().slice(0, 800) || `exit code ${code}`
+          console.error('chat: claude exited non-zero', code, stderr)
+          try {
+            controller.enqueue(encoder.encode(`\n\n[claude error: ${detail}]`))
+          } catch {}
+        }
+        controller.close()
+      })
+    },
+    cancel() {
+      if (timer) clearTimeout(timer)
+      try { proc.kill('SIGTERM') } catch {}
+    },
+  })
 
-    return new Response(readable, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-store',
-      },
-    })
-  } catch (err) {
-    console.error('chat: request failed', err)
-    return Response.json({ error: 'Claude request failed. Check the API key and server logs.' }, { status: 502 })
-  }
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-store',
+    },
+  })
 }
