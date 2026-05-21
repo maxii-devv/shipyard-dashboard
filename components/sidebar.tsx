@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Tag, FileSearch, Activity, Instagram, Youtube, Settings, BarChart3, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Tag, FileSearch, Activity, Instagram, Youtube, Settings, BarChart3, PanelLeftClose, PanelLeftOpen, Terminal } from 'lucide-react'
 import { Sparkline } from '@/components/sparkline'
 import { useSettings } from '@/components/settings-context'
 
@@ -60,6 +60,7 @@ const sections: NavSection[] = [
     label: 'Tools',
     items: [
       { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3, color: '#38bdf8' },
+      { href: '/dashboard/run', label: 'Terminal', icon: Terminal, color: '#a78bfa' },
       { href: '/dashboard/tag', label: 'Tag Posts', icon: Tag, color: '#f59e0b', disabled: true },
       { href: '/dashboard/review', label: 'Review', icon: FileSearch, color: '#6366f1', disabled: true },
       { href: '/dashboard/system', label: 'System', icon: Activity, color: '#34d399', disabled: true },

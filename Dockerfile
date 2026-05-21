@@ -58,6 +58,13 @@ COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=build --chown=nextjs:nodejs /app/public ./public
 COPY --from=build --chown=nextjs:nodejs /app/migrations ./migrations
 
+# Izan slash-command tree — copied verbatim from the parent repo via the
+# `izan-runtime/` folder. Mounted at /data/izan-project so the /api/run route
+# can `claude --print` with that as cwd; Claude Code then discovers the
+# project-local .claude/commands/ inside it.
+RUN mkdir -p /data/izan-project && chown -R nextjs:nodejs /data/izan-project
+COPY --from=build --chown=nextjs:nodejs /app/izan-runtime/ /data/izan-project/
+
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]
