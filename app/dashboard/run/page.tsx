@@ -180,7 +180,7 @@ export default function RunPage() {
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <TerminalIcon className="w-5 h-5" style={{ color: '#a78bfa' }} />
-            Terminal
+            COOK NOW
           </h1>
           <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
             Runs <span className="font-mono text-white/60">claude</span> in the container with your izan slash commands available. Multi-turn — replies stay in the same session.
