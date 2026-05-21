@@ -221,8 +221,9 @@ export default function RunPage() {
             {COMMANDS.map(c => (
               <button
                 key={c.cmd}
-                onClick={() => setInput(c.cmd)}
-                className="text-left flex items-center gap-2 px-3 py-2 rounded-lg transition-all"
+                onClick={() => run(c.cmd)}
+                disabled={busy}
+                className="text-left flex items-center gap-2 px-3 py-2 rounded-lg transition-all disabled:opacity-40"
                 style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
                 onMouseEnter={e => {
                   e.currentTarget.style.background = 'rgba(167,139,250,0.08)'
