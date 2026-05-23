@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { Send, Terminal as TerminalIcon, RotateCw, Wrench, AlertCircle, ChevronRight } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Send, Square, Terminal as TerminalIcon, RotateCw, Wrench, AlertCircle, ChevronRight } from 'lucide-react'
 
 // One turn of the conversation, broken into the chunks the /api/run protocol
 // emits. We render each chunk inline so tool calls show up between text
@@ -16,29 +16,48 @@ interface Turn {
   chunks: Chunk[]
 }
 
-// Suggested commands — exactly the slash commands the container has under
-// /data/izan-project/.claude/commands/. The viral-coach-skills ones are
-// nested, hence the namespaced form.
-const COMMANDS: { cmd: string; hint: string }[] = [
-  { cmd: '/izan-feedback-research', hint: 'Full pipeline + feedback loop' },
-  { cmd: '/izan-full-pipeline', hint: 'Full pipeline without feedback loop' },
-  { cmd: '/izan-viral-spotter', hint: 'Scrape creators for 5x outliers' },
-  { cmd: '/izan-creator-finder', hint: 'Discover new niche creators' },
-  { cmd: '/izan-transcribe-and-script', hint: 'Transcribe + rewrite the queue' },
-  { cmd: '/izan-viral-scripter', hint: 'Standalone script writer' },
-  { cmd: '/viral-coach-skills:content-plan', hint: 'Plan next post from live data' },
-  { cmd: '/viral-coach-skills:create-carousel', hint: 'Carousel slide-by-slide script' },
-  { cmd: '/viral-coach-skills:create-course-lesson', hint: 'Educational post from patterns' },
-  { cmd: '/viral-coach-skills:tag-posts', hint: 'Auto-tag untagged posts' },
-]
+interface Command { cmd: string; hint: string }
 
 export default function RunPage() {
   const [turns, setTurns] = useState<Turn[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [pickerIndex, setPickerIndex] = useState(0)
+  // Commands are scanned from .claude/commands/ on the server — add a skill
+  // file and it appears here on next page load, no code edit needed.
+  const [commands, setCommands] = useState<Command[]>([])
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/commands')
+      .then(r => r.json())
+      .then(d => { if (!cancelled && Array.isArray(d.commands)) setCommands(d.commands) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // AbortController for the in-flight /api/run fetch. abort() triggers the
+  // server's `cancel()` handler which SIGTERMs the claude subprocess.
+  const abortRef = useRef<AbortController | null>(null)
+
+  // Slash picker: show when input starts with `/` and we're not running.
+  // Match by substring against the bare command text so `viral` finds both
+  // `/izan-viral-spotter` and `/viral-coach-skills:*`.
+  const pickerMatches = useMemo(() => {
+    if (!input.startsWith('/')) return []
+    const query = input.slice(1).toLowerCase().trim()
+    if (!query) return commands
+    return commands.filter(c =>
+      c.cmd.toLowerCase().includes(query) || c.hint.toLowerCase().includes(query)
+    )
+  }, [input, commands])
+  const showPicker = !busy && input.startsWith('/') && pickerMatches.length > 0
+
+  // Clamp the highlighted index whenever the match list changes.
+  useEffect(() => {
+    setPickerIndex(i => Math.min(Math.max(0, i), Math.max(0, pickerMatches.length - 1)))
+  }, [pickerMatches.length])
 
   function scrollToBottom() {
     requestAnimationFrame(() => {
@@ -58,11 +77,16 @@ export default function RunPage() {
     setBusy(true)
     scrollToBottom()
 
+    // Fresh AbortController for this turn so Stop can hard-cancel.
+    const ac = new AbortController()
+    abortRef.current = ac
+
     try {
       const res = await fetch('/api/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, sessionId }),
+        signal: ac.signal,
       })
       if (!res.ok || !res.body) {
         const detail = res.ok ? 'No response body' : `HTTP ${res.status}`
@@ -89,11 +113,23 @@ export default function RunPage() {
       }
       if (pending.trim()) processLine(pending)
     } catch (err) {
-      appendChunk({ kind: 'error', value: (err as Error).message })
+      // AbortError is the expected outcome of clicking Stop — surface a
+      // dedicated message so the user sees their kill landed.
+      const e = err as Error
+      if (e.name === 'AbortError') {
+        appendChunk({ kind: 'error', value: 'Stopped by user.' })
+      } else {
+        appendChunk({ kind: 'error', value: e.message })
+      }
     } finally {
+      if (abortRef.current === ac) abortRef.current = null
       setBusy(false)
       scrollToBottom()
     }
+  }
+
+  function stop() {
+    abortRef.current?.abort()
   }
 
   function processLine(line: string) {
@@ -157,8 +193,39 @@ export default function RunPage() {
     setSessionId(null)
   }
 
-  // Cmd+Enter / Ctrl+Enter to run.
+  // Cmd+Enter / Ctrl+Enter to run. Picker nav (Up/Down/Enter/Tab/Escape)
+  // takes precedence when the slash picker is open — Enter fills the input
+  // (no auto-run), matching Claude Code's own picker UX.
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (showPicker) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setPickerIndex(i => (i + 1) % pickerMatches.length)
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setPickerIndex(i => (i - 1 + pickerMatches.length) % pickerMatches.length)
+        return
+      }
+      if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault()
+        const pick = pickerMatches[pickerIndex]
+        if (pick) setInput(pick.cmd + ' ')
+        return
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault()
+        const pick = pickerMatches[pickerIndex]
+        if (pick) setInput(pick.cmd + ' ')
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setInput('')
+        return
+      }
+    }
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault()
       run(input)
@@ -218,7 +285,7 @@ export default function RunPage() {
             Available commands
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            {COMMANDS.map(c => (
+            {commands.map(c => (
               <button
                 key={c.cmd}
                 onClick={() => run(c.cmd)}
@@ -273,35 +340,93 @@ export default function RunPage() {
       </div>
 
       {/* ── Input ─────────────────────────────────────────────────────────── */}
-      <div
-        className="rounded-xl p-3 flex items-end gap-2"
-        style={{ background: '#2d2c2a', border: '1px solid rgba(255,255,255,0.06)' }}
-      >
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Type a slash command, paste a follow-up question, or hit a quick-pick above…"
-          disabled={busy}
-          rows={1}
-          className="flex-1 bg-transparent text-[13px] text-white placeholder:text-white/25 resize-none outline-none font-mono"
-          style={{ maxHeight: 160 }}
-        />
-        <button
-          onClick={() => run(input)}
-          disabled={busy || !input.trim()}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-30"
-          style={{
-            background: 'rgba(167,139,250,0.14)',
-            color: '#a78bfa',
-            border: '1px solid rgba(167,139,250,0.28)',
-          }}
+      <div className="relative">
+        {/* Slash-command picker, positioned above the input. Click an item
+            to fill the textarea (does NOT auto-run — user must hit ⌘↵). */}
+        {showPicker && (
+          <div
+            className="absolute left-0 right-0 bottom-full mb-2 rounded-lg overflow-hidden z-10"
+            style={{ background: '#1f1e1d', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
+          >
+            <div className="text-[12px] text-white/40 px-3 pt-2 pb-1">
+              Slash Commands
+            </div>
+            <div className="max-h-[280px] overflow-y-auto pb-1">
+              {pickerMatches.map((c, i) => {
+                const active = i === pickerIndex
+                return (
+                  <button
+                    key={c.cmd}
+                    type="button"
+                    onMouseEnter={() => setPickerIndex(i)}
+                    onMouseDown={e => {
+                      // mousedown (not click) so the textarea doesn't lose
+                      // focus before we set the value.
+                      e.preventDefault()
+                      setInput(c.cmd + ' ')
+                      textareaRef.current?.focus()
+                    }}
+                    className="w-full text-left px-3 py-1.5 transition-colors"
+                    style={{
+                      background: active ? '#1e4a86' : 'transparent',
+                      color: active ? '#ffffff' : 'rgba(255,255,255,0.85)',
+                    }}
+                    title={c.hint}
+                  >
+                    <span className="font-mono text-[13px] font-semibold">{c.cmd}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        <div
+          className="rounded-xl p-3 flex items-end gap-2"
+          style={{ background: '#2d2c2a', border: '1px solid rgba(255,255,255,0.06)' }}
         >
-          <Send className="w-3.5 h-3.5" />
-          Run
-          <span className="text-[10px] opacity-60 font-mono">⌘↵</span>
-        </button>
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Type / for commands, or paste a follow-up question. ⌘/Ctrl + Enter to run."
+            disabled={busy}
+            rows={1}
+            className="flex-1 bg-transparent text-[13px] text-white placeholder:text-white/25 resize-none outline-none font-mono"
+            style={{ maxHeight: 160 }}
+          />
+          {busy ? (
+            <button
+              onClick={stop}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-semibold transition-all"
+              style={{
+                background: 'rgba(239,68,68,0.14)',
+                color: '#fca5a5',
+                border: '1px solid rgba(239,68,68,0.32)',
+              }}
+              title="Hard kill the running command (SIGTERM the claude subprocess)"
+            >
+              <Square className="w-3.5 h-3.5 fill-current" />
+              Stop
+            </button>
+          ) : (
+            <button
+              onClick={() => run(input)}
+              disabled={!input.trim()}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-30"
+              style={{
+                background: 'rgba(167,139,250,0.14)',
+                color: '#a78bfa',
+                border: '1px solid rgba(167,139,250,0.28)',
+              }}
+            >
+              <Send className="w-3.5 h-3.5" />
+              Run
+              <span className="text-[10px] opacity-60 font-mono">⌘↵</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
