@@ -275,7 +275,33 @@ export default function RunPage() {
         </div>
       </div>
 
-      {/* ── Command quick-picks ───────────────────────────────────────────── */}
+      {/* ── Transcript ────────────────────────────────────────────────────── */}
+      <div
+        ref={scrollRef}
+        className="rounded-xl overflow-y-auto px-4 py-4 space-y-4"
+        style={{
+          background: '#2d2c2a',
+          border: '1px solid rgba(255,255,255,0.06)',
+          minHeight: 400,
+          maxHeight: 'calc(100vh - 360px)',
+        }}
+      >
+        {turns.length === 0 ? (
+          <div className="text-center py-12 text-white/30 text-[12px]">
+            Pick a command below or type one in the input — ⌘/Ctrl + Enter to run.
+          </div>
+        ) : (
+          turns.map((t, i) => <TurnView key={i} turn={t} />)
+        )}
+        {busy && (
+          <div className="flex items-center gap-2 text-[11px] text-white/40 font-mono">
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#a78bfa' }} />
+            running…
+          </div>
+        )}
+      </div>
+
+      {/* ── Command quick-picks (below the transcript, above the input) ─── */}
       {turns.length === 0 && (
         <div
           className="rounded-xl p-4"
@@ -312,32 +338,6 @@ export default function RunPage() {
           </p>
         </div>
       )}
-
-      {/* ── Transcript ────────────────────────────────────────────────────── */}
-      <div
-        ref={scrollRef}
-        className="rounded-xl overflow-y-auto px-4 py-4 space-y-4"
-        style={{
-          background: '#2d2c2a',
-          border: '1px solid rgba(255,255,255,0.06)',
-          minHeight: 400,
-          maxHeight: 'calc(100vh - 360px)',
-        }}
-      >
-        {turns.length === 0 ? (
-          <div className="text-center py-12 text-white/30 text-[12px]">
-            Pick a command above or type one below, then ⌘/Ctrl + Enter to run.
-          </div>
-        ) : (
-          turns.map((t, i) => <TurnView key={i} turn={t} />)
-        )}
-        {busy && (
-          <div className="flex items-center gap-2 text-[11px] text-white/40 font-mono">
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#a78bfa' }} />
-            running…
-          </div>
-        )}
-      </div>
 
       {/* ── Input ─────────────────────────────────────────────────────────── */}
       <div className="relative">
