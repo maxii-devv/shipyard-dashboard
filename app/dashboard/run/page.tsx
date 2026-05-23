@@ -400,7 +400,7 @@ export default function RunPage() {
           <div className="text-[10px] uppercase tracking-widest font-semibold text-white/40 mb-3">
             Available commands
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+          <div className="flex flex-col gap-1">
             {commands.map(c => (
               <div key={c.cmd} className="flex items-baseline gap-3 py-1">
                 <span className="font-mono text-[12px] text-white/85 flex-shrink-0">{c.cmd}</span>
