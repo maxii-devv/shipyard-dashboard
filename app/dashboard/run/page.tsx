@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Send, Square, Terminal as TerminalIcon, RotateCw, Wrench, AlertCircle, ChevronRight } from 'lucide-react'
+import { Send, Square, Terminal as TerminalIcon, RotateCw, Wrench, AlertCircle } from 'lucide-react'
 
 // One turn of the conversation, broken into the chunks the /api/run protocol
 // emits. We render each chunk inline so tool calls show up between text
@@ -301,44 +301,6 @@ export default function RunPage() {
         )}
       </div>
 
-      {/* ── Command quick-picks (below the transcript, above the input) ─── */}
-      {turns.length === 0 && (
-        <div
-          className="rounded-xl p-4"
-          style={{ background: '#2d2c2a', border: '1px solid rgba(255,255,255,0.06)' }}
-        >
-          <div className="text-[10px] uppercase tracking-widest font-semibold text-white/40 mb-3">
-            Available commands
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            {commands.map(c => (
-              <button
-                key={c.cmd}
-                onClick={() => run(c.cmd)}
-                disabled={busy}
-                className="text-left flex items-center gap-2 px-3 py-2 rounded-lg transition-all disabled:opacity-40"
-                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(167,139,250,0.08)'
-                  e.currentTarget.style.borderColor = 'rgba(167,139,250,0.22)'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.02)'
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'
-                }}
-              >
-                <ChevronRight className="w-3 h-3 text-white/30 flex-shrink-0" />
-                <span className="font-mono text-[12px] text-white/85 flex-shrink-0">{c.cmd}</span>
-                <span className="text-[11px] text-white/35 truncate ml-auto">{c.hint}</span>
-              </button>
-            ))}
-          </div>
-          <p className="text-[11px] text-white/30 mt-3">
-            MCP-dependent commands (Notion, Playwright) need their servers configured in this container — they will fail with &quot;tool not available&quot; until then.
-          </p>
-        </div>
-      )}
-
       {/* ── Input ─────────────────────────────────────────────────────────── */}
       <div className="relative">
         {/* Slash-command picker, positioned above the input. Click an item
@@ -428,6 +390,29 @@ export default function RunPage() {
           )}
         </div>
       </div>
+
+      {/* ── Command reference (below the input, read-only) ──────────────── */}
+      {turns.length === 0 && (
+        <div
+          className="rounded-xl p-4"
+          style={{ background: '#2d2c2a', border: '1px solid rgba(255,255,255,0.06)' }}
+        >
+          <div className="text-[10px] uppercase tracking-widest font-semibold text-white/40 mb-3">
+            Available commands
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+            {commands.map(c => (
+              <div key={c.cmd} className="flex items-baseline gap-3 py-1">
+                <span className="font-mono text-[12px] text-white/85 flex-shrink-0">{c.cmd}</span>
+                <span className="text-[11px] text-white/40 truncate">{c.hint}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-white/30 mt-3">
+            Type a command into the input above to run it. MCP-dependent commands (Notion, Playwright) need their servers configured in this container — they will fail with &quot;tool not available&quot; until then.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
