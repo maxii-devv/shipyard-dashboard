@@ -401,7 +401,7 @@ export default function RunPage() {
             Available commands
           </div>
           <div className="flex flex-col gap-1">
-            {commands.map(c => (
+            {commands.filter(c => !c.cmd.startsWith('/viral-coach')).map(c => (
               <div key={c.cmd} className="flex items-baseline gap-3 py-1">
                 <span className="font-mono text-[12px] text-white/85 flex-shrink-0">{c.cmd}</span>
                 <span className="text-[11px] text-white/40 truncate">{c.hint}</span>
