@@ -67,8 +67,8 @@ async function saveTag(formData: FormData) {
     [instagram_media_id, hook_type, content_type, layout, cta_keyword]
   )
 
-  revalidatePath('/tag')
-  revalidatePath('/')
+  revalidatePath('/dashboard/tag')
+  revalidatePath('/dashboard')
 }
 
 function fmt(n: number) {
@@ -84,7 +84,7 @@ export default async function TagPage() {
     <main className={styles.main}>
       <header className={styles.header}>
         <div className={styles.headerLeft}>
-          <Link href="/" className={styles.back}>← Dashboard</Link>
+          <Link href="/dashboard" className={styles.back}>← Dashboard</Link>
           <h1 className={styles.title}>Tag Posts</h1>
         </div>
         <p className={styles.subtitle}>{posts.length} untagged</p>
@@ -93,7 +93,7 @@ export default async function TagPage() {
       {posts.length === 0 ? (
         <div className={styles.done}>
           <p className={styles.doneText}>All posts tagged ✓</p>
-          <Link href="/" className={styles.doneLink}>View patterns on dashboard →</Link>
+          <Link href="/dashboard/review" className={styles.doneLink}>Review tagged posts →</Link>
         </div>
       ) : (
         <div className={styles.list}>

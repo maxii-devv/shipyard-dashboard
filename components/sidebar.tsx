@@ -61,8 +61,8 @@ const sections: NavSection[] = [
     items: [
       { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3, color: '#38bdf8' },
       { href: '/dashboard/run', label: 'COOK NOW', icon: Terminal, color: '#a78bfa' },
-      { href: '/dashboard/tag', label: 'Tag Posts', icon: Tag, color: '#f59e0b', disabled: true },
-      { href: '/dashboard/review', label: 'Review', icon: FileSearch, color: '#6366f1', disabled: true },
+      { href: '/dashboard/tag', label: 'Tag Posts', icon: Tag, color: '#f59e0b' },
+      { href: '/dashboard/review', label: 'Review', icon: FileSearch, color: '#6366f1' },
       { href: '/dashboard/system', label: 'System', icon: Activity, color: '#34d399', disabled: true },
     ],
   },
