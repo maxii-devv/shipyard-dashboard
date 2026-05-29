@@ -10,6 +10,12 @@
 // Everything else requires the `app_session` cookie. Unauthenticated browser
 // requests are redirected to /login; unauthenticated API requests get 401 JSON.
 //
+// Optionally (REQUIRE_IG_IDENTITY=1) a second factor is layered on: after the
+// password, a route also needs the `ig_identity` cookie — set only after an
+// allowlisted Instagram OAuth login. Password-but-no-identity browser requests
+// are sent to /verify; API requests get 401. The /verify page and the IG-login
+// endpoints are exempt so the identity cookie can actually be obtained.
+//
 // Beyond auth, this also:
 //   - Fast-404s common bot-scanner paths (no auth round-trip, no logs noise)
 //   - Enforces same-origin on every state-changing request (POST/PATCH/PUT/DELETE)
@@ -18,11 +24,23 @@
 //     to every response
 
 import { NextResponse, type NextRequest } from 'next/server'
-import { verifySession, SESSION_COOKIE } from '@/lib/session'
+import {
+  verifySession,
+  SESSION_COOKIE,
+  verifyIdentity,
+  IDENTITY_COOKIE,
+  identityRequired,
+} from '@/lib/session'
 import { isSameOrigin } from '@/lib/security/origin'
 import { applySecurityHeaders } from '@/lib/security/headers'
 
 const PUBLIC_PATH_RE = /^\/(login|api\/login|api\/logout)(\/|$)/
+
+// The Instagram identity-login flow itself: reachable with just the password
+// session so a password-holder can perform the IG login that grants the
+// identity cookie. Without this carve-out the second factor would be a
+// chicken-and-egg lockout (can't log in because you're not logged in).
+const IG_LOGIN_FLOW_RE = /^\/(verify|api\/instagram\/(connect|callback))(\/|$)/
 const CRON_PATH_RE = /^\/api\/cron(\/|$)/
 const FILES_PATH_RE = /^\/api\/files(\/|$)/
 const STATIC_PATH_RE = /^\/(?:_next\/static|_next\/image|favicon\.ico|robots\.txt|icons?\/)/
@@ -78,6 +96,22 @@ export async function middleware(req: NextRequest) {
   // 5. Session-gated everything else.
   const cookie = req.cookies.get(SESSION_COOKIE)?.value
   if (await verifySession(cookie)) {
+    // 5a. Optional Instagram identity second factor. When enabled, every
+    //     protected route also needs a verified-allowlisted IG login — except
+    //     the IG-login flow itself, which only needs the password (so it can
+    //     be used to obtain the identity cookie in the first place).
+    if (identityRequired() && !IG_LOGIN_FLOW_RE.test(pathname)) {
+      const id = req.cookies.get(IDENTITY_COOKIE)?.value
+      if (!(await verifyIdentity(id))) {
+        if (pathname.startsWith('/api/')) {
+          return applySecurityHeaders(req, NextResponse.json({ error: 'instagram identity required' }, { status: 401 }))
+        }
+        const url = req.nextUrl.clone()
+        url.pathname = '/verify'
+        if (method === 'GET') url.searchParams.set('next', pathname + (req.nextUrl.search || ''))
+        return applySecurityHeaders(req, NextResponse.redirect(url))
+      }
+    }
     return applySecurityHeaders(req, NextResponse.next())
   }
 
