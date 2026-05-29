@@ -9,12 +9,48 @@ import { STATE_COOKIE } from '../connect/route'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// Bounce back to the dashboard with a result param the banner reads to show a
-// success/error toast. Always clears the one-time state cookie.
-function back(req: NextRequest, params: Record<string, string>) {
-  const url = new URL('/dashboard', req.nextUrl.origin)
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
-  const res = NextResponse.redirect(url)
+type Result = { ok: boolean; user?: string; reason?: string }
+
+// Return a tiny HTML page that hands the result back to the dashboard.
+//
+// The Connect button opens this whole flow in a popup window. When the popup
+// lands here it postMessages the result to the opener (the dashboard) and
+// closes itself — the dashboard never navigates. If there is no opener (the
+// popup was blocked and we fell back to a full-page redirect), it instead
+// navigates back to /dashboard with the ?ig= param the banner also understands.
+function respond(result: Result) {
+  const params = new URLSearchParams()
+  params.set('ig', result.ok ? 'connected' : 'error')
+  if (result.user) params.set('user', result.user)
+  if (result.reason) params.set('reason', result.reason)
+
+  // `<` is escaped so a reason string can never break out of the <script>.
+  const payload = JSON.stringify({ type: 'ig-oauth', ...result }).replace(/</g, '\\u003c')
+  const fallback = JSON.stringify('/dashboard?' + params.toString()).replace(/</g, '\\u003c')
+
+  const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Connecting Instagram…</title></head>
+<body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#262624;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+<p style="opacity:.7;font-size:14px">Finishing up — you can close this window.</p>
+<script>
+(function () {
+  var result = ${payload};
+  try {
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage(result, window.location.origin);
+      window.close();
+      return;
+    }
+  } catch (e) {}
+  window.location.replace(${fallback});
+})();
+</script>
+</body></html>`
+
+  const res = new NextResponse(html, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  })
   res.cookies.delete(STATE_COOKIE)
   return res
 }
@@ -25,17 +61,14 @@ export async function GET(req: NextRequest) {
   // User declined consent, or Instagram returned an error.
   const oauthError = searchParams.get('error')
   if (oauthError) {
-    return back(req, {
-      ig: 'error',
-      reason: searchParams.get('error_description') || oauthError,
-    })
+    return respond({ ok: false, reason: searchParams.get('error_description') || oauthError })
   }
 
   const code = searchParams.get('code')
   const state = searchParams.get('state')
   const expected = req.cookies.get(STATE_COOKIE)?.value
   if (!code || !state || !expected || state !== expected) {
-    return back(req, { ig: 'error', reason: 'invalid_state' })
+    return respond({ ok: false, reason: 'invalid_state' })
   }
 
   try {
@@ -45,15 +78,12 @@ export async function GET(req: NextRequest) {
     // Validate before storing so a broken token never replaces a working one.
     const check = await validateInstagramToken(longToken)
     if (!check.valid) {
-      return back(req, { ig: 'error', reason: check.error || 'validation_failed' })
+      return respond({ ok: false, reason: check.error || 'validation_failed' })
     }
 
     await setInstagramToken(longToken)
-    return back(req, { ig: 'connected', user: check.username || '' })
+    return respond({ ok: true, user: check.username || '' })
   } catch (err) {
-    return back(req, {
-      ig: 'error',
-      reason: err instanceof Error ? err.message : 'exchange_failed',
-    })
+    return respond({ ok: false, reason: err instanceof Error ? err.message : 'exchange_failed' })
   }
 }
