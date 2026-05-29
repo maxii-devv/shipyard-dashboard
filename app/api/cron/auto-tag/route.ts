@@ -151,11 +151,13 @@ export async function GET(req: NextRequest) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  // Hard gate: with no brain we'd commit null tags and permanently exclude the
-  // post from future tagging. Refuse rather than poison the data.
-  if (!process.env.GROQ_API_KEY) {
+  // Hard gate: with no real brain we'd burn n8n/Groq calls every run and risk
+  // committing null tags. A placeholder is a non-empty string, so check the
+  // real Groq prefix (`gsk_`) rather than mere presence.
+  const groqKey = process.env.GROQ_API_KEY
+  if (!groqKey || !groqKey.startsWith('gsk_')) {
     return NextResponse.json(
-      { error: 'GROQ_API_KEY not configured — classification disabled, nothing tagged' },
+      { error: 'GROQ_API_KEY not configured (no real gsk_ key) — nothing tagged' },
       { status: 503 }
     )
   }
@@ -209,12 +211,16 @@ export async function GET(req: NextRequest) {
       continue
     }
 
-    // Cache the transcript regardless, so a Groq failure doesn't force a
-    // re-transcribe next run.
-    await pool.query(
-      `UPDATE content_performance SET transcript = $1 WHERE instagram_media_id = $2`,
-      [transcript, row.instagram_media_id]
-    )
+    // Cache ONLY real transcriptions, so a Groq failure doesn't force a costly
+    // re-transcribe next run. Never write the caption into the transcript
+    // column — that would lock a video with a transient n8n miss to
+    // caption-based tagging forever (it'd read as 'cached' next run).
+    if (source === 'transcribed') {
+      await pool.query(
+        `UPDATE content_performance SET transcript = $1 WHERE instagram_media_id = $2`,
+        [transcript, row.instagram_media_id]
+      )
+    }
 
     const cls = await classifyViaGroq(transcript)
     if (!cls) {
