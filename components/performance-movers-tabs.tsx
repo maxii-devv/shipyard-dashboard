@@ -111,9 +111,8 @@ export function PerformanceMoversTabs({
             color: 'rgba(255,255,255,0.35)',
           }}
         >
-          No view growth recorded yet. Snapshots run daily at 06:00 UTC (Vercel
-          Hobby plan — Pro unlocks 6h sync) — come back in 24h for day-over-day
-          deltas.
+          No view growth recorded yet. Snapshots refresh every 3 hours — come
+          back in 24h for day-over-day deltas.
         </div>
       ) : (
         <MoverGrid movers={movers} />

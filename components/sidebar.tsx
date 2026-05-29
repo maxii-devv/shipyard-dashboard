@@ -453,9 +453,9 @@ export function Sidebar({ userEmail: _userEmail }: SidebarProps) {
           color: 'rgba(255,255,255,0.25)',
         }}
       >
-        Data syncs daily at 06:00 UTC
+        Data syncs every 3 hours
         <span style={{ display: 'block', marginTop: 2, color: 'rgba(255,255,255,0.18)' }}>
-          (Vercel Hobby plan — Pro unlocks 6h sync)
+          (self-hosted · izan-cron)
         </span>
       </div>
     </aside>
