@@ -5,7 +5,6 @@ import { getPostingActivity, getPostingInsight, getLatestPost } from '@/lib/serv
 import { PostingHeatmap } from '@/components/posting-heatmap'
 import { PerformanceMoversTabs } from '@/components/performance-movers-tabs'
 import { CoachTabs } from '@/components/coach-tabs'
-import { CoachAskInline } from '@/components/coach-ask-inline'
 import { LastPostCoach } from '@/components/last-post-coach'
 import { DashboardRefreshButton } from '@/components/dashboard-refresh-button'
 import { generateInsights, generateSalesInsights, generateLastPostCoaching } from '@/lib/services/coachInsightsService'
@@ -156,17 +155,8 @@ export default async function DashboardHome({
         <LastPostCoach post={latestPost} coaching={lastPostCoaching} />
       )}
 
-      {/* ── Ask the Coach + Coach (Sales / Views tabs) ────────────────────── */}
-      {/* Side by side: Ask-the-Coach chat on the left (1/3 width), Coach panel
-          on the right (2/3). On a narrow viewport this collapses to one
-          column so the chat moves above the coach. items-stretch keeps both
-          cards equal height when they sit next to each other. */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-stretch">
-        <CoachAskInline days={days} accent="#a78bfa" />
-        <div className="lg:col-span-2">
-          <CoachTabs salesCoach={salesCoach} viewsCoach={viewsCoach} daysLabel={`${days}d`} />
-        </div>
-      </div>
+      {/* ── Coach (Sales / Views tabs) ────────────────────────────────────── */}
+      <CoachTabs salesCoach={salesCoach} viewsCoach={viewsCoach} daysLabel={`${days}d`} />
 
       {/* ── Top Performers / Top Movers (segmented control) ───────────────── */}
       {/* Single section with a tab toggle in the header. "Top Performers"
