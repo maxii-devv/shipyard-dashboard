@@ -198,3 +198,20 @@ export async function getMediaInsights(
 
   return parseInsights(await res.json())
 }
+
+// Re-fetches a single media's current playable video URL (the mp4 CDN URL).
+// IG CDN media_url expires within days, so we always fetch a fresh one by id
+// right before transcription. Returns null for non-video media or any failure.
+export async function getMediaVideoUrl(mediaId: string): Promise<string | null> {
+  try {
+    const token = await getToken()
+    const url = `${BASE}/${mediaId}?fields=media_type,media_url&access_token=${token}`
+    const res = await fetchWithRetry(url)
+    if (!res.ok) return null
+    const d = (await res.json()) as { media_type?: string; media_url?: string }
+    if (!['VIDEO', 'REELS'].includes(d.media_type ?? '')) return null
+    return d.media_url ?? null
+  } catch {
+    return null
+  }
+}
