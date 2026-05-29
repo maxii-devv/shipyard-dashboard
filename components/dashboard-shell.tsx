@@ -2,6 +2,7 @@
 
 import { Sidebar } from '@/components/sidebar'
 import { useSettings } from '@/components/settings-context'
+import { InstagramConnectBanner } from '@/components/instagram-connect-banner'
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { sidebarHidden } = useSettings()
@@ -17,6 +18,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         className="flex-1 min-h-screen transition-all duration-200"
         style={{ marginLeft: sidebarHidden ? 'calc(60px + 24px)' : 'calc(16rem + 12px)' }}
       >
+        <InstagramConnectBanner />
         {children}
       </main>
     </div>

@@ -35,6 +35,41 @@ async function getToken(): Promise<string> {
   return tokenPromise
 }
 
+// Stores a new long-lived token (from the OAuth "Connect Instagram" flow) and
+// busts the in-process cache so the very next API call uses it — no container
+// restart needed, unlike the env fallback.
+export async function setInstagramToken(token: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO system_config (key, value, updated_at) VALUES ($1, $2, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+    [TOKEN_KEY, token]
+  )
+  tokenPromise = null
+}
+
+// Live validity check against the Graph API. Returns the connected account's
+// username when the token works, or an error string when it doesn't. Pass a
+// candidate token to test it before saving; omit to check the stored one.
+export async function validateInstagramToken(
+  token?: string
+): Promise<{ valid: boolean; username?: string; userId?: string; error?: string }> {
+  try {
+    const t = token ?? (await getToken())
+    const res = await fetchWithRetry(`${BASE}/me?fields=user_id,username&access_token=${t}`)
+    const data = (await res.json().catch(() => ({}))) as {
+      user_id?: string
+      username?: string
+      error?: { message?: string }
+    }
+    if (!res.ok) {
+      return { valid: false, error: data?.error?.message || `HTTP ${res.status}` }
+    }
+    return { valid: true, username: data.username, userId: data.user_id }
+  } catch (err) {
+    return { valid: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export interface IGTokenStatus {
   present: boolean
   age_days: number | null
