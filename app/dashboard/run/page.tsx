@@ -56,10 +56,6 @@ export default function RunPage() {
           <TerminalIcon className="w-5 h-5" style={{ color: '#a78bfa' }} />
           COOK NOW
         </h1>
-        <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
-          Click an agent to run it. Each runs <span className="font-mono text-white/60">claude</span> in
-          the container with your izan slash commands — the bar fills while it works.
-        </p>
       </div>
 
       {loadErr && (
