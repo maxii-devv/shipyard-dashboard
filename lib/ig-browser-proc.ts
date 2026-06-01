@@ -7,12 +7,14 @@ import { join } from 'node:path'
 // lazily on first use; the reference lives at module scope so it persists across
 // requests within the same Next server process. The child self-exits when idle.
 
-// Load child_process at runtime via createRequire so Turbopack doesn't recognize
-// the spawn() call site below. When it does, it tries to resolve spawn's first
-// arg (the script path / "-e") as a build-time module request and fails — see
-// the build errors that drove this. With spawn coming from an opaque require,
-// the call site isn't traced and we can pass the real script path directly.
-const { spawn } = createRequire(import.meta.url)('node:child_process') as typeof import('node:child_process')
+// Load child_process at runtime via createRequire AND under a renamed binding.
+// Turbopack's file-tracing recognizes any call to a binding named `spawn`/`fork`/
+// `execFile` and tries to resolve its first arg (the script path) as a build-time
+// module request — which fails for our runtime path. Coming from an opaque
+// require and called as `launchNode(...)`, the site isn't recognized, so we can
+// pass the real script path directly.
+const childProcess = createRequire(import.meta.url)('node:child_process') as typeof import('node:child_process')
+const launchNode = childProcess.spawn
 
 const PORT = Number(process.env.IG_BROWSER_PORT ?? 9223)
 const RUN_CWD = process.env.CLAUDE_RUN_CWD ?? '/data/izan-project'
@@ -41,7 +43,7 @@ export async function ensureBrowserChild(): Promise<void> {
   if (await isUp()) return
 
   if (!child || child.exitCode !== null || child.killed) {
-    child = spawn('node', [SCRIPT_PATH], {
+    child = launchNode('node', [SCRIPT_PATH], {
       stdio: 'ignore',
       env: {
         ...process.env,
