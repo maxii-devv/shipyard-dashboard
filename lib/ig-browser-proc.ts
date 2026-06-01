@@ -35,11 +35,16 @@ export async function ensureBrowserChild(): Promise<void> {
   if (await isUp()) return
 
   if (!child || child.exitCode !== null || child.killed) {
-    child = spawn('node', [SCRIPT_PATH], {
+    // Pass the script via env and require() it from a `node -e` bootstrap rather
+    // than as a spawn arg. Turbopack traces child_process spawn-arg paths as
+    // module requests and errors when they don't resolve at build time; keeping
+    // the path out of the arg list (it's plain data in env) sidesteps that.
+    child = spawn('node', ['-e', 'require(process.env.IG_BROWSER_SCRIPT)'], {
       stdio: 'ignore',
       env: {
         ...process.env,
         NODE_PATH,
+        IG_BROWSER_SCRIPT: SCRIPT_PATH,
         PW_PORT: String(PORT),
         PW_PROFILE: '/data/pw-profile',
         PW_CHROME: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
