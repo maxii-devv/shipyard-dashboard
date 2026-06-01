@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Play, Square, Terminal as TerminalIcon, Check, AlertCircle,
   ChevronDown, ChevronRight, Loader2, Wrench,
+  Instagram, LogIn, RefreshCw,
 } from 'lucide-react'
 
 // ── Stream chunks (same /api/run protocol as the old terminal) ──────────────
@@ -73,6 +74,8 @@ export default function RunPage() {
         </div>
       )}
 
+      <IgSessionCard />
+
       {pipelines.length > 0 && (
         <Section title="Pipelines & research">
           {pipelines.map(c => <CommandCard key={c.cmd} command={c} />)}
@@ -88,9 +91,206 @@ export default function RunPage() {
       <p className="text-[11px] text-white/25 max-w-3xl">
         Each click starts a fresh, one-shot run with no typing. Commands that need a pasted URL or a
         mid-run answer (e.g. the scripter) can&apos;t be driven from here — use those from Claude Code directly.
-        MCP-dependent steps (Notion, Playwright) need their servers configured in this container or they
-        fail with &quot;tool not available&quot;.
+        The Playwright browser runs server-side in this container; Instagram pipelines need the dummy
+        account logged in (above). Steps that save to Notion still need the Notion MCP server configured.
       </p>
+    </div>
+  )
+}
+
+// ── Instagram session ───────────────────────────────────────────────────────
+// One-time login for the server-side Playwright browser. The dummy account's
+// session persists in the /data/pw-profile volume, so this normally only needs
+// doing once (or when IG expires the session). Credentials are POSTed to
+// /api/ig-login and typed into IG by the server browser; the password is never
+// echoed back to this page.
+type IgState = 'unknown' | 'checking' | 'in' | 'out'
+type LoginPhase = 'idle' | 'running' | 'done' | 'error'
+
+function IgSessionCard() {
+  const [state, setState] = useState<IgState>('unknown')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [phase, setPhase] = useState<LoginPhase>('idle')
+  const [steps, setSteps] = useState<string[]>([])
+  const [result, setResult] = useState<string>('')   // the LOGIN_RESULT: line
+  const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => () => abortRef.current?.abort(), [])
+
+  async function checkStatus() {
+    setState('checking')
+    try {
+      const r = await fetch('/api/ig-login/status')
+      const d = await r.json()
+      setState(d.loggedIn === true ? 'in' : d.loggedIn === false ? 'out' : 'unknown')
+    } catch {
+      setState('unknown')
+    }
+  }
+
+  async function login() {
+    if (phase === 'running' || !username || !password) return
+    setPhase('running')
+    setSteps([])
+    setResult('')
+    const ac = new AbortController()
+    abortRef.current = ac
+    let finalLine = ''
+    let sawError = false
+    try {
+      const res = await fetch('/api/ig-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+        signal: ac.signal,
+      })
+      if (!res.ok || !res.body) {
+        setResult(`LOGIN_RESULT: FAIL: HTTP ${res.status}`)
+        setPhase('error')
+        return
+      }
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let pending = ''
+      const handle = (raw: string) => {
+        if (!raw.startsWith('<<<')) return
+        const end = raw.indexOf('>>>')
+        if (end === -1) return
+        const tag = raw.slice(3, end)
+        const payload = raw.slice(end + 3)
+        if (tag === 'error') { sawError = true; setSteps(p => [...p, `⚠ ${payload}`]); return }
+        if (tag === 'status') {
+          const m = payload.match(/LOGIN_RESULT:\s*(.+)/)
+          if (m) finalLine = m[1].trim()
+          const clean = payload.replace(/LOGIN_RESULT:.*/, '').trim()
+          if (clean) setSteps(p => [...p, clean].slice(-8))
+        }
+      }
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        pending += decoder.decode(value, { stream: true })
+        let nl: number
+        while ((nl = pending.indexOf('\n')) !== -1) {
+          handle(pending.slice(0, nl)); pending = pending.slice(nl + 1)
+        }
+      }
+      if (pending.trim()) handle(pending)
+
+      setResult(finalLine || (sawError ? 'FAIL: no result' : 'No result returned'))
+      const ok = /^(OK|ALREADY)/i.test(finalLine)
+      setPhase(ok ? 'done' : 'error')
+      if (ok) setState('in')
+    } catch (err) {
+      const e = err as Error
+      setResult(e.name === 'AbortError' ? 'Cancelled' : `FAIL: ${e.message}`)
+      setPhase('error')
+    } finally {
+      if (abortRef.current === ac) abortRef.current = null
+    }
+  }
+
+  const badge =
+    state === 'in' ? { t: 'Logged in', c: '#34d399', bg: 'rgba(52,211,153,0.12)' }
+    : state === 'out' ? { t: 'Logged out', c: '#fca5a5', bg: 'rgba(239,68,68,0.12)' }
+    : state === 'checking' ? { t: 'Checking…', c: '#a78bfa', bg: 'rgba(167,139,250,0.12)' }
+    : { t: 'Unknown', c: 'rgba(255,255,255,0.45)', bg: 'rgba(255,255,255,0.06)' }
+
+  const challenge = /^CHALLENGE/i.test(result)
+  const success = /^(OK|ALREADY)/i.test(result)
+  const resultColor = success ? '#34d399' : challenge ? '#fbbf24' : result ? '#fca5a5' : 'inherit'
+
+  return (
+    <div
+      className="rounded-xl p-4 flex flex-col gap-3"
+      style={{ background: '#2d2c2a', border: '1px solid rgba(236,72,153,0.18)' }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Instagram className="w-4 h-4 flex-shrink-0" style={{ color: '#ec4899' }} />
+          <span className="font-semibold text-[13px] text-white/90">Instagram session</span>
+          <span
+            className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+            style={{ color: badge.c, background: badge.bg }}
+          >
+            {badge.t}
+          </span>
+        </div>
+        <button
+          onClick={checkStatus}
+          disabled={state === 'checking'}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium flex-shrink-0 disabled:opacity-50"
+          style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
+          title="Check whether the dummy account is logged in (launches the server browser)"
+        >
+          <RefreshCw className={`w-3 h-3 ${state === 'checking' ? 'animate-spin' : ''}`} /> Check
+        </button>
+      </div>
+
+      <p className="text-[11px] text-white/40 leading-relaxed">
+        Log the dummy Instagram account in once — the session persists in the container, so the
+        IG scraping pipelines can browse. The password is typed into Instagram by the server and is
+        never shown or stored here.
+      </p>
+
+      {/* ── Login form ──────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="text"
+          autoComplete="off"
+          placeholder="dummy username"
+          value={username}
+          onChange={e => setUsername(e.target.value)}
+          disabled={phase === 'running'}
+          className="text-[12px] font-mono px-2.5 py-1.5 rounded-lg flex-1 min-w-[140px] outline-none disabled:opacity-50"
+          style={{ background: '#222120', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.85)' }}
+        />
+        <input
+          type="password"
+          autoComplete="off"
+          placeholder="dummy password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          disabled={phase === 'running'}
+          className="text-[12px] font-mono px-2.5 py-1.5 rounded-lg flex-1 min-w-[140px] outline-none disabled:opacity-50"
+          style={{ background: '#222120', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.85)' }}
+        />
+        <button
+          onClick={login}
+          disabled={phase === 'running' || !username || !password}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold flex-shrink-0 disabled:opacity-40"
+          style={{ background: 'rgba(236,72,153,0.16)', color: '#f9a8d4', border: '1px solid rgba(236,72,153,0.32)' }}
+        >
+          {phase === 'running'
+            ? <><Loader2 className="w-3 h-3 animate-spin" /> Logging in…</>
+            : <><LogIn className="w-3 h-3" /> Log in</>}
+        </button>
+      </div>
+
+      {/* ── Live steps + result ─────────────────────────────────────────── */}
+      {(steps.length > 0 || result) && (
+        <div
+          className="rounded-lg px-3 py-2 space-y-1"
+          style={{ background: '#222120', border: '1px solid rgba(255,255,255,0.05)' }}
+        >
+          {steps.map((s, i) => (
+            <div key={i} className="text-[11px] font-mono text-white/50 truncate">{s}</div>
+          ))}
+          {result && (
+            <div className="text-[12px] font-mono font-semibold pt-1" style={{ color: resultColor }}>
+              {result}
+            </div>
+          )}
+          {challenge && (
+            <div className="text-[11px] text-amber-300/80 leading-relaxed pt-1">
+              Instagram asked for a verification code. Approve the login from the dummy account&apos;s
+              email / app, then click <span className="font-semibold">Check</span>. If it keeps
+              challenging, the account may need a manual first login from a normal browser.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
