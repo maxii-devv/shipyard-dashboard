@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Play, Square, Terminal as TerminalIcon, Check, AlertCircle,
   ChevronDown, ChevronRight, Loader2, Wrench,
-  Instagram, LogIn, RefreshCw,
+  Instagram, LogIn, RefreshCw, Monitor, X,
 } from 'lucide-react'
 
 // ── Stream chunks (same /api/run protocol as the old terminal) ──────────────
@@ -114,6 +114,7 @@ function IgSessionCard() {
   const [phase, setPhase] = useState<LoginPhase>('idle')
   const [steps, setSteps] = useState<string[]>([])
   const [result, setResult] = useState<string>('')   // the LOGIN_RESULT: line
+  const [showLive, setShowLive] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => () => abortRef.current?.abort(), [])
@@ -291,6 +292,160 @@ function IgSessionCard() {
           )}
         </div>
       )}
+
+      {/* ── Live browser (log in by hand on the VPS Chromium) ───────────────── */}
+      <div className="pt-0.5">
+        <button
+          onClick={() => setShowLive(v => !v)}
+          className="flex items-center gap-1.5 text-[11px] font-medium"
+          style={{ color: '#f9a8d4' }}
+        >
+          <Monitor className="w-3 h-3" />
+          {showLive ? 'Hide live browser' : 'Open live browser — log in by hand'}
+        </button>
+      </div>
+      {showLive && <IgLivePanel onClosed={() => setShowLive(false)} onMaybeLoggedIn={checkStatus} />}
+    </div>
+  )
+}
+
+// Live screencast of the VPS Chromium. Polls a JPEG ~1x/sec and forwards the
+// user's clicks/keystrokes to the server-side browser so they can log in to
+// Instagram by hand and solve any challenge visually. Holds the profile open,
+// so it tells the user to Close before running pipelines (single-instance lock).
+function IgLivePanel({ onClosed, onMaybeLoggedIn }: { onClosed: () => void; onMaybeLoggedIn: () => void }) {
+  const [status, setStatus] = useState<'starting' | 'live' | 'error'>('starting')
+  const [err, setErr] = useState<string>('')
+  const [tick, setTick] = useState(0)
+  const imgRef = useRef<HTMLImageElement | null>(null)
+  const VW = 1100, VH = 760
+
+  // Boot the child + poll screenshots.
+  useEffect(() => {
+    let alive = true
+    let timer: ReturnType<typeof setInterval> | null = null
+    ;(async () => {
+      try {
+        const r = await fetch('/api/ig-browser', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'start' }),
+        })
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `start failed (${r.status})`)
+        if (!alive) return
+        setStatus('live')
+        timer = setInterval(() => { if (alive) setTick(t => t + 1) }, 1100)
+      } catch (e) {
+        if (alive) { setErr((e as Error).message); setStatus('error') }
+      }
+    })()
+    return () => { alive = false; if (timer) clearInterval(timer) }
+  }, [])
+
+  // Map a DOM event on the displayed <img> to viewport coordinates.
+  function toViewport(e: React.MouseEvent) {
+    const el = imgRef.current
+    if (!el) return null
+    const rect = el.getBoundingClientRect()
+    if (!rect.width || !rect.height) return null
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * VW)
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * VH)
+    return { x: Math.max(0, Math.min(VW, x)), y: Math.max(0, Math.min(VH, y)) }
+  }
+
+  async function send(action: string, payload: Record<string, unknown> = {}) {
+    try {
+      await fetch('/api/ig-browser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...payload }),
+      })
+    } catch { /* transient; next poll recovers */ }
+  }
+
+  function onClick(e: React.MouseEvent) {
+    const p = toViewport(e)
+    if (p) send('click', p)
+  }
+
+  const SPECIAL: Record<string, string> = {
+    Enter: 'Enter', Backspace: 'Backspace', Tab: 'Tab', Escape: 'Escape', Delete: 'Delete',
+    ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight',
+  }
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    // Keep focus + browser shortcuts from hijacking the panel.
+    e.preventDefault()
+    if (SPECIAL[e.key]) { send('key', { key: SPECIAL[e.key] }); return }
+    if (e.key.length === 1) send('type', { text: e.key })
+  }
+
+  async function close() {
+    onMaybeLoggedIn()
+    await send('stop')
+    onClosed()
+  }
+
+  return (
+    <div className="space-y-2 pt-1">
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => send('nav', { url: 'https://www.instagram.com/accounts/login/' })}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium"
+          style={{ background: 'rgba(236,72,153,0.14)', color: '#f9a8d4', border: '1px solid rgba(236,72,153,0.28)' }}
+        >
+          <Instagram className="w-3 h-3" /> IG login page
+        </button>
+        <button
+          onClick={() => setTick(t => t + 1)}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-white/70"
+          style={{ background: '#222120', border: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          <RefreshCw className="w-3 h-3" /> Refresh
+        </button>
+        <button
+          onClick={close}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium ml-auto"
+          style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          <X className="w-3 h-3" /> Close &amp; free browser
+        </button>
+      </div>
+
+      <div
+        tabIndex={0}
+        onKeyDown={onKeyDown}
+        className="relative rounded-lg overflow-hidden outline-none focus:ring-1 focus:ring-pink-400/40"
+        style={{ aspectRatio: `${VW} / ${VH}`, background: '#000', border: '1px solid rgba(255,255,255,0.08)' }}
+      >
+        {status === 'live' && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            ref={imgRef}
+            src={`/api/ig-browser/shot?t=${tick}`}
+            alt="live browser"
+            onClick={onClick}
+            draggable={false}
+            className="w-full h-full object-contain cursor-crosshair select-none"
+          />
+        )}
+        {status === 'starting' && (
+          <div className="absolute inset-0 flex items-center justify-center gap-2 text-white/50 text-[12px]">
+            <Loader2 className="w-4 h-4 animate-spin" /> Starting browser on the VPS…
+          </div>
+        )}
+        {status === 'error' && (
+          <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-[12px] text-red-300/80">
+            {err || 'Could not start the live browser.'}
+          </div>
+        )}
+      </div>
+
+      <p className="text-[11px] text-white/40 leading-relaxed">
+        Click into the frame, then type to interact. Log in to the dummy Instagram account here and
+        solve any verification. The session is saved to the server profile. <span className="text-white/55 font-medium">Close
+        &amp; free browser</span> before running a pipeline — they share one Chromium.
+      </p>
     </div>
   )
 }
