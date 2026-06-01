@@ -51,8 +51,9 @@ ENV NODE_ENV=production \
 # - @playwright/mcp: the MCP server Claude Code loads to get browser_* tools
 #   (binary on PATH: mcp-server-playwright).
 RUN apk add --no-cache \
-      libc6-compat git ripgrep \
+      libc6-compat bash git ripgrep \
       chromium nss freetype harfbuzz ca-certificates ttf-freefont font-noto-emoji \
+ && if [ ! -e /usr/bin/chromium-browser ]; then ln -sf "$(command -v chromium)" /usr/bin/chromium-browser; fi \
  && npm install -g --no-audit --no-fund @anthropic-ai/claude-code @playwright/mcp
 
 # Run as a non-root user (matches the official Next.js standalone example).
