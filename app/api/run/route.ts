@@ -15,6 +15,10 @@ export const runtime = 'nodejs'
 const CLAUDE_BIN = process.env.CLAUDE_BIN ?? 'claude'
 const MODEL = process.env.CLAUDE_RUN_MODEL ?? 'claude-opus-4-7'
 const RUN_CWD = process.env.CLAUDE_RUN_CWD ?? '/data/izan-project'
+// MCP servers (Playwright browser tools, etc.) live in this config inside the
+// run cwd. --strict-mcp-config means ONLY this file is loaded — no user/global
+// MCP config leaks in. Set CLAUDE_MCP_CONFIG='' to disable MCP entirely.
+const MCP_CONFIG = process.env.CLAUDE_MCP_CONFIG ?? `${RUN_CWD}/.mcp.json`
 
 // Soft cap per turn. Izan commands are long-running (playwright loops,
 // notion calls), so this is generous compared to /api/chat.
@@ -71,6 +75,9 @@ export async function POST(req: NextRequest) {
     '--verbose',
     '--model', MODEL,
   ]
+  if (MCP_CONFIG) {
+    args.push('--mcp-config', MCP_CONFIG, '--strict-mcp-config')
+  }
   if (sessionId) {
     args.push('--resume', sessionId)
   }

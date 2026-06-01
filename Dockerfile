@@ -24,12 +24,17 @@ RUN npm run build
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
+# Playwright MCP uses Alpine's system Chromium (its bundled download is
+# glibc-only and won't run on musl), so skip the download and point both the
+# playwright lib and the MCP server at the apk-installed binary.
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
     UPLOADS_DIR=/data/uploads \
-    CLAUDE_HOME=/home/nextjs
+    CLAUDE_HOME=/home/nextjs \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Claude Code CLI for /api/chat. The chat route shells out to `claude --print`
 # instead of calling the Anthropic API directly, so model usage is billed to
@@ -39,8 +44,16 @@ ENV NODE_ENV=production \
 # - libc6-compat: glibc shim for prebuilt native binaries
 # - git, ripgrep: tools Claude Code probes for on startup; we disable them in
 #   the spawn args but the CLI is quieter when they exist on PATH.
-RUN apk add --no-cache libc6-compat git ripgrep \
- && npm install -g --no-audit --no-fund @anthropic-ai/claude-code
+# - chromium + nss/freetype/harfbuzz/fonts: the headless browser Playwright MCP
+#   drives. Alpine's apk build is musl-native (Playwright's bundled Chromium is
+#   glibc-only and segfaults here), so we install the system package and point
+#   the MCP server at /usr/bin/chromium-browser via env above.
+# - @playwright/mcp: the MCP server Claude Code loads to get browser_* tools
+#   (binary on PATH: mcp-server-playwright).
+RUN apk add --no-cache \
+      libc6-compat git ripgrep \
+      chromium nss freetype harfbuzz ca-certificates ttf-freefont font-noto-emoji \
+ && npm install -g --no-audit --no-fund @anthropic-ai/claude-code @playwright/mcp
 
 # Run as a non-root user (matches the official Next.js standalone example).
 # The Claude Code session/auth lives at /home/nextjs/.claude, which is
@@ -51,7 +64,7 @@ RUN apk add --no-cache libc6-compat git ripgrep \
 # state persists across rebuilds.
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 --home /home/nextjs --shell /bin/sh nextjs \
- && mkdir -p /data/uploads /home/nextjs/.claude \
+ && mkdir -p /data/uploads /data/pw-profile /home/nextjs/.claude \
  && ln -sf /home/nextjs/.claude/.claude.json /home/nextjs/.claude.json \
  && chown -R nextjs:nodejs /data /home/nextjs
 
