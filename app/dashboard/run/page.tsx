@@ -115,7 +115,33 @@ function IgSessionCard() {
   const [steps, setSteps] = useState<string[]>([])
   const [result, setResult] = useState<string>('')   // the LOGIN_RESULT: line
   const [showLive, setShowLive] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [cookieText, setCookieText] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  async function importSession() {
+    if (importing || !cookieText.trim()) return
+    setImporting(true)
+    setImportMsg(null)
+    try {
+      const r = await fetch('/api/ig-browser/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw: cookieText }),
+      })
+      const d = await r.json()
+      if (!r.ok) { setImportMsg({ ok: false, text: d.error || `Import failed (${r.status})` }); return }
+      setImportMsg({ ok: !d.navError, text: d.note || `Imported ${d.imported} cookies.` })
+      setCookieText('')
+      checkStatus()
+    } catch (e) {
+      setImportMsg({ ok: false, text: (e as Error).message })
+    } finally {
+      setImporting(false)
+    }
+  }
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
@@ -293,17 +319,62 @@ function IgSessionCard() {
         </div>
       )}
 
-      {/* ── Live browser (log in by hand on the VPS Chromium) ───────────────── */}
-      <div className="pt-0.5">
+      {/* ── Session import + live browser ──────────────────────────────────── */}
+      <div className="flex items-center gap-4 pt-0.5 flex-wrap">
         <button
-          onClick={() => setShowLive(v => !v)}
+          onClick={() => setShowImport(v => !v)}
           className="flex items-center gap-1.5 text-[11px] font-medium"
           style={{ color: '#f9a8d4' }}
         >
+          <LogIn className="w-3 h-3" />
+          {showImport ? 'Hide session import' : 'Import session from your browser'}
+        </button>
+        <button
+          onClick={() => setShowLive(v => !v)}
+          className="flex items-center gap-1.5 text-[11px] font-medium text-white/55"
+        >
           <Monitor className="w-3 h-3" />
-          {showLive ? 'Hide live browser' : 'Open live browser — log in by hand'}
+          {showLive ? 'Hide live browser' : 'Open live browser'}
         </button>
       </div>
+
+      {showImport && (
+        <div className="space-y-2 pt-1">
+          <p className="text-[11px] text-white/45 leading-relaxed">
+            The server IP is blocked by Instagram’s login page, so log in to the dummy account in a
+            normal browser at home, then paste its cookies here. Use a cookie extension (e.g.
+            <span className="text-white/70"> Cookie-Editor</span>) on instagram.com → <span className="text-white/70">Export → Export as JSON</span>.
+            Cookies are written into the server profile and never logged.
+          </p>
+          <textarea
+            value={cookieText}
+            onChange={e => setCookieText(e.target.value)}
+            disabled={importing}
+            placeholder='[{"name":"sessionid","value":"…","domain":".instagram.com", …}, …]'
+            rows={4}
+            className="w-full text-[11px] font-mono px-2.5 py-2 rounded-lg outline-none resize-y disabled:opacity-50"
+            style={{ background: '#222120', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.85)' }}
+          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={importSession}
+              disabled={importing || !cookieText.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold disabled:opacity-40"
+              style={{ background: 'rgba(236,72,153,0.16)', color: '#f9a8d4', border: '1px solid rgba(236,72,153,0.32)' }}
+            >
+              {importing
+                ? <><Loader2 className="w-3 h-3 animate-spin" /> Importing…</>
+                : <><LogIn className="w-3 h-3" /> Import cookies</>}
+            </button>
+            {importMsg && (
+              <span className="text-[11px] leading-snug" style={{ color: importMsg.ok ? '#86efac' : '#fca5a5' }}>
+                {importMsg.text}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {showLive && <IgLivePanel onClosed={() => setShowLive(false)} onMaybeLoggedIn={checkStatus} />}
     </div>
   )

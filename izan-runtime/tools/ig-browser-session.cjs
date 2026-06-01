@@ -101,6 +101,14 @@ const server = http.createServer(async (req, res) => {
         case '/key': await page.keyboard.press(String(data.key || '')); break
         case '/scroll': await page.mouse.wheel(0, Number(data.dy || 0)); break
         case '/nav': await page.goto(String(data.url || LOGIN_URL), { waitUntil: 'domcontentloaded', timeout: 60000 }); break
+        case '/cookies': {
+          // Inject session cookies exported from a logged-in browser into the
+          // persistent profile. Persists to disk on context close; also takes
+          // effect immediately for the current context.
+          const cookies = Array.isArray(data.cookies) ? data.cookies : []
+          await context.addCookies(cookies)
+          return json({ ok: true, count: cookies.length })
+        }
         case '/shutdown': json({ ok: true }); return shutdown()
         default: return json({ error: 'unknown path' }, 404)
       }
