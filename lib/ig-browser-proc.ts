@@ -1,5 +1,6 @@
 import 'server-only'
 import { spawn, type ChildProcess } from 'node:child_process'
+import { join } from 'node:path'
 
 // Manages the long-lived ig-browser-session.cjs child (see that file). Spawned
 // lazily on first use; the reference lives at module scope so it persists across
@@ -10,6 +11,10 @@ const RUN_CWD = process.env.CLAUDE_RUN_CWD ?? '/data/izan-project'
 // playwright-core ships nested under @playwright/mcp; expose both global roots
 // on NODE_PATH so the child's require('playwright-core') resolves.
 const NODE_PATH = '/usr/local/lib/node_modules/@playwright/mcp/node_modules:/usr/local/lib/node_modules'
+
+// Built with join() (not a template literal) so Turbopack doesn't treat the
+// spawned script path as a module specifier to resolve at build time.
+const SCRIPT_PATH = process.env.IG_BROWSER_SCRIPT || join(RUN_CWD, 'tools', 'ig-browser-session.cjs')
 
 export const IG_BROWSER_PORT = PORT
 export const IG_BROWSER_BASE = `http://127.0.0.1:${PORT}`
@@ -30,7 +35,7 @@ export async function ensureBrowserChild(): Promise<void> {
   if (await isUp()) return
 
   if (!child || child.exitCode !== null || child.killed) {
-    child = spawn('node', [`${RUN_CWD}/tools/ig-browser-session.cjs`], {
+    child = spawn('node', [SCRIPT_PATH], {
       stdio: 'ignore',
       env: {
         ...process.env,
