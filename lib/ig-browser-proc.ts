@@ -1,5 +1,4 @@
 import 'server-only'
-import { createRequire } from 'node:module'
 import type { ChildProcess } from 'node:child_process'
 import { join } from 'node:path'
 
@@ -7,14 +6,15 @@ import { join } from 'node:path'
 // lazily on first use; the reference lives at module scope so it persists across
 // requests within the same Next server process. The child self-exits when idle.
 
-// Load child_process at runtime via createRequire AND under a renamed binding.
-// Turbopack's file-tracing recognizes any call to a binding named `spawn`/`fork`/
-// `execFile` and tries to resolve its first arg (the script path) as a build-time
-// module request — which fails for our runtime path. Coming from an opaque
-// require and called as `launchNode(...)`, the site isn't recognized, so we can
-// pass the real script path directly.
-const childProcess = createRequire(import.meta.url)('node:child_process') as typeof import('node:child_process')
-const launchNode = childProcess.spawn
+// Turbopack's file-tracing models child_process and resolves the first arg of any
+// spawn/fork call as a build-time module request — it follows the binding even
+// through `import`, `createRequire`, and renames, so our runtime script path
+// can't resolve and the build fails. Obtaining require via eval() makes the
+// module (and thus spawn) opaque to the tracer, so the arg is left alone. require
+// exists in the Next server runtime; this file is server-only.
+// eslint-disable-next-line no-eval
+const dynamicRequire = eval('require') as NodeRequire
+const launchNode = (dynamicRequire('node:child_process') as typeof import('node:child_process')).spawn
 
 const PORT = Number(process.env.IG_BROWSER_PORT ?? 9223)
 const RUN_CWD = process.env.CLAUDE_RUN_CWD ?? '/data/izan-project'
