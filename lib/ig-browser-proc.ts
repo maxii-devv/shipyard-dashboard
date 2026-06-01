@@ -1,10 +1,18 @@
 import 'server-only'
-import { spawn, type ChildProcess } from 'node:child_process'
+import { createRequire } from 'node:module'
+import type { ChildProcess } from 'node:child_process'
 import { join } from 'node:path'
 
 // Manages the long-lived ig-browser-session.cjs child (see that file). Spawned
 // lazily on first use; the reference lives at module scope so it persists across
 // requests within the same Next server process. The child self-exits when idle.
+
+// Load child_process at runtime via createRequire so Turbopack doesn't recognize
+// the spawn() call site below. When it does, it tries to resolve spawn's first
+// arg (the script path / "-e") as a build-time module request and fails — see
+// the build errors that drove this. With spawn coming from an opaque require,
+// the call site isn't traced and we can pass the real script path directly.
+const { spawn } = createRequire(import.meta.url)('node:child_process') as typeof import('node:child_process')
 
 const PORT = Number(process.env.IG_BROWSER_PORT ?? 9223)
 const RUN_CWD = process.env.CLAUDE_RUN_CWD ?? '/data/izan-project'
@@ -12,8 +20,6 @@ const RUN_CWD = process.env.CLAUDE_RUN_CWD ?? '/data/izan-project'
 // on NODE_PATH so the child's require('playwright-core') resolves.
 const NODE_PATH = '/usr/local/lib/node_modules/@playwright/mcp/node_modules:/usr/local/lib/node_modules'
 
-// Built with join() (not a template literal) so Turbopack doesn't treat the
-// spawned script path as a module specifier to resolve at build time.
 const SCRIPT_PATH = process.env.IG_BROWSER_SCRIPT || join(RUN_CWD, 'tools', 'ig-browser-session.cjs')
 
 export const IG_BROWSER_PORT = PORT
@@ -35,16 +41,11 @@ export async function ensureBrowserChild(): Promise<void> {
   if (await isUp()) return
 
   if (!child || child.exitCode !== null || child.killed) {
-    // Pass the script via env and require() it from a `node -e` bootstrap rather
-    // than as a spawn arg. Turbopack traces child_process spawn-arg paths as
-    // module requests and errors when they don't resolve at build time; keeping
-    // the path out of the arg list (it's plain data in env) sidesteps that.
-    child = spawn('node', ['-e', 'require(process.env.IG_BROWSER_SCRIPT)'], {
+    child = spawn('node', [SCRIPT_PATH], {
       stdio: 'ignore',
       env: {
         ...process.env,
         NODE_PATH,
-        IG_BROWSER_SCRIPT: SCRIPT_PATH,
         PW_PORT: String(PORT),
         PW_PROFILE: '/data/pw-profile',
         PW_CHROME: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
